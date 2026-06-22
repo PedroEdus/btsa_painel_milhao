@@ -1,0 +1,12 @@
+streamlit>=1.42          # auth nativa OIDC (st.login/st.user)
+Authlib>=1.3.2           # backend OIDC exigido pela auth do Streamlit
+pandas>=2.2
+numpy>=1.26
+plotly>=5.24
+python-dotenv>=1.0
+pyarrow>=17.0
+# Conexão OneLake (Parquet snapshot via Azure Data Lake Storage Gen2)
+azure-identity>=1.17
+azure-storage-file-datalake>=12.0
+# Testes
+pytest>=8.0

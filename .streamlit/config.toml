@@ -1,0 +1,14 @@
+[theme]
+base = "light"
+primaryColor = "#2a9d45"          # brand verde (design system CGID)
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F5F5F6"
+textColor = "#232329"
+font = "\"Segoe UI\", system-ui, -apple-system, Roboto, Arial, sans-serif"  # texto (CONTEXT item 1); DIN p/ números via CSS (theme.py)
+
+[server]
+headless = true
+enableXsrfProtection = true
+
+[browser]
+gatherUsageStats = false

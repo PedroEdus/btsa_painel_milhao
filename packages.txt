@@ -1,0 +1,9 @@
+# Pacotes apt instalados pelo Streamlit Community Cloud (repo Debian padrão).
+# Necessários p/ compilar/usar pyodbc.
+unixodbc
+unixodbc-dev
+# ATENÇÃO: o "ODBC Driver 18 for SQL Server" (msodbcsql18) é da Microsoft e
+# NÃO está no repo Debian padrão — packages.txt não consegue instalá-lo no
+# Community Cloud. Enquanto USE_MOCK=true, isso não importa. Para conectar ao
+# Fabric real a partir do Cloud, revisar o connector (ex.: pymssql + FreeTDS)
+# ou hospedar em ambiente que permita o driver MS.

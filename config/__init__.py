@@ -1,0 +1,3 @@
+from config.settings import CACHE_TTL_SEGUNDOS, CAMPANHA, REGRA_CUPOM, USE_MOCK
+
+__all__ = ["CACHE_TTL_SEGUNDOS", "CAMPANHA", "REGRA_CUPOM", "USE_MOCK"]
