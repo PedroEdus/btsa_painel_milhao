@@ -1055,14 +1055,15 @@ def tabela(df: pd.DataFrame, titulo: str = "", sub: str = "", status: bool = Tru
     else:
         obj = df
 
-    # Congela a 1ª coluna visível (ignora colunas técnicas de status, ex. badge)
-    # com largura fixa (medium) — evita que nomes longos estourem a tela e
-    # bloqueiem a rolagem das demais colunas. Texto longo é truncado.
+    # Colunas com largura fixa "medium" p/ preencher melhor o espaço; a 1ª
+    # visível é congelada (ignora colunas técnicas de status, ex. badge).
+    # Texto longo é truncado (Streamlit não quebra linha em célula).
     col_cfg = None
     if pin_primeira:
         _visiveis = [c for c in df.columns if c not in _COLS_STATUS]
         if _visiveis:
-            col_cfg = {_visiveis[0]: st.column_config.Column(pinned=True, width="medium")}
+            col_cfg = {c: st.column_config.Column(width="medium") for c in _visiveis}
+            col_cfg[_visiveis[0]] = st.column_config.Column(pinned=True, width="medium")
 
     if titulo:
         with card(titulo, sub):

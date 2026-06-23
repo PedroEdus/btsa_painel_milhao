@@ -402,15 +402,15 @@ with tabs[4]:
                 column_config={
                     "Obra": st.column_config.TextColumn("Obra", pinned=True, width="medium"),
                     "Total recebido": st.column_config.TextColumn(
-                        "Total recebido",
+                        "Total recebido", width="medium",
                         help="Soma de todos os pagamentos recebidos pela obra no período do snapshot.",
                     ),
                     "Cupons": st.column_config.TextColumn(
-                        "Cupons",
+                        "Cupons", width="medium",
                         help="Cupons gerados pelos clientes da obra. Calculado pelo Fabric: R$ recebido ÷ R$ 100 por cupom.",
                     ),
                     "Média diária": st.column_config.TextColumn(
-                        "Média diária",
+                        "Média diária", width="medium",
                         help="Recebimento médio por dia com pagamento: Total recebido ÷ dias em que houve ao menos um pagamento na obra.",
                     ),
                 },
