@@ -241,30 +241,30 @@ with tabs[1]:
             use_container_width=True,
             column_config={
                 "Cidade": st.column_config.TextColumn(
-                    "Cidade", pinned=True, width="small"),
+                    "Cidade", pinned=True),
                 "Clientes": st.column_config.NumberColumn(
-                    "Clientes", width="small",
+                    "Clientes",
                     help="Total de clientes únicos (CPF) com venda ativa na cidade."),
                 "Repres.": st.column_config.NumberColumn(
-                    "Repres.", width="small",
+                    "Repres.",
                     help="Representatividade: participação da cidade no total de clientes do portfólio."),
                 "Elegíveis": st.column_config.NumberColumn(
-                    "Elegíveis", width="small",
+                    "Elegíveis",
                     help="Clientes APTO na cidade — sem inadimplência, participam dos sorteios."),
                 "Pendentes": st.column_config.NumberColumn(
-                    "Pendentes", width="small",
+                    "Pendentes",
                     help="Clientes NÃO APTO na cidade — com parcelas vencidas."),
                 "% Inadimpl.": st.column_config.NumberColumn(
-                    "% Inadimpl.", width="small",
+                    "% Inadimpl.",
                     help="Inadimplência da cidade: pendentes ÷ total de clientes da cidade."),
                 "Cupons": st.column_config.NumberColumn(
-                    "Cupons", width="small",
+                    "Cupons",
                     help="Cupons gerados pelos clientes da cidade (1 cupom por R$ 100 recebido)."),
                 "% Cupons": st.column_config.NumberColumn(
-                    "% Cupons", width="small",
+                    "% Cupons",
                     help="Efeito da cidade: participação no total de cupons gerados na campanha."),
                 "Valor (R$)": st.column_config.NumberColumn(
-                    "Valor (R$)", width="small",
+                    "Valor (R$)",
                     help="Soma do valor total recebido pelos clientes da cidade."),
             },
         )

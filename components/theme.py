@@ -470,12 +470,16 @@ button[data-baseweb="tab"][aria-selected="true"] {{
   .hero-chip {{ font-size:11.5px; }}
   .banner-prem {{ flex-direction:column; gap:12px; }}
   .banner-prem-h {{ font-size:15px; }}
-  /* 2 pills por linha no mobile */
-  .banner-pills {{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }}
-  .banner-pill {{ min-width:0; padding:7px 8px; }}
+  /* 2 pills por linha no mobile (!important: a base .banner-pills vem depois) */
+  .banner-pills {{ display:grid !important; grid-template-columns:1fr 1fr !important; gap:8px !important; }}
+  .banner-pill {{ min-width:0 !important; padding:7px 8px; }}
   .banner-pill-m {{ font-size:10px; letter-spacing:.3px; }}
   .banner-pill-t {{ font-size:11.5px; }}
   .card-title {{ font-size:13.5px; }}
+  /* Tabelas: encolhe o conteúdo (canvas não aceita font-size via CSS) p/ caber
+     mais colunas. Largura compensada p/ preencher o container após o scale. */
+  [data-testid="stDataFrame"] {{ transform:scale(0.82); transform-origin:top left;
+    width:122% !important; }}
 }}
 @media (max-width: 420px) {{
   .stats-row {{ grid-template-columns:1fr; }}
