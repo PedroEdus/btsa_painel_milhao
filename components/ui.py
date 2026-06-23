@@ -1074,19 +1074,23 @@ def tabela(df: pd.DataFrame, titulo: str = "", sub: str = "", status: bool = Tru
     # as demais ficam sem width p/ expandir e preencher o container no desktop
     # (width="stretch"). No mobile o container é estreito → colunas encolhem e
     # rola na horizontal, com a 1ª fixa. (ignora colunas técnicas de status.)
+    _mob = is_mobile()
     col_cfg = None
     if pin_primeira:
         _visiveis = [c for c in df.columns if c not in _COLS_STATUS]
         if _visiveis:
-            # 1a coluna: fixa (pinned) com largura fixa. Colunas do meio também
-            # com largura fixa p/ a soma exceder a tela do celular → overflow →
-            # scroll horizontal → a 1a fica realmente fixa no mobile. A última
-            # fica sem width: estica p/ preencher o container no desktop.
+            # 1a coluna: fixa (pinned). No mobile TODAS as demais ganham largura
+            # fixa → a soma excede a tela → a grade rola INTERNAMENTE (não a
+            # página) → a 1a coluna pinned fica realmente fixa. No desktop a
+            # última fica sem width e estica p/ preencher o container (sem sobra).
             col_cfg = {_visiveis[0]: st.column_config.Column(pinned=True, width="medium")}
-            for c in _visiveis[1:-1]:
-                col_cfg[c] = st.column_config.Column(width="small")
+            _mids = _visiveis[1:]
+            _fix = _mids if _mob else _mids[:-1]
+            _wcol = "medium" if _mob else "small"
+            for c in _fix:
+                col_cfg[c] = st.column_config.Column(width=_wcol)
 
-    _w = "content" if is_mobile() else "stretch"
+    _w = "stretch"  # prende a grade na largura do container → scroll interno
     if titulo:
         with card(titulo, sub):
             st.dataframe(obj, hide_index=True, width=_w, height=altura,

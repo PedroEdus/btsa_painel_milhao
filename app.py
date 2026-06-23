@@ -85,6 +85,10 @@ try:
 except Exception as _e:
     _ua_dbg = f"(erro headers: {_e})"
 st.warning(f"🔧 DEBUG is_mobile={is_mobile()} · UA={_ua_dbg[:120]}")
+_mob = is_mobile()
+# largura das colunas numéricas das tabelas: no mobile fixa (medium) p/ forçar
+# overflow interno e travar a 1a coluna; no desktop "small" e última auto.
+_wnum = "medium" if _mob else "small"
 
 if not resultado.ok:
     for erro in resultado.erros:
@@ -246,33 +250,33 @@ with tabs[1]:
             _sty,
             hide_index=True,
             height=420,
-            width="content" if is_mobile() else "stretch",
+            width="stretch",
             column_config={
                 "Cidade": st.column_config.TextColumn(
                     "Cidade", pinned=True, width="medium"),
                 "Clientes": st.column_config.NumberColumn(
-                    "Clientes", width="small",
+                    "Clientes", width=_wnum,
                     help="Total de clientes únicos (CPF) com venda ativa na cidade."),
                 "Repres.": st.column_config.NumberColumn(
-                    "Repres.", width="small",
+                    "Repres.", width=_wnum,
                     help="Representatividade: participação da cidade no total de clientes do portfólio."),
                 "Elegíveis": st.column_config.NumberColumn(
-                    "Elegíveis", width="small",
+                    "Elegíveis", width=_wnum,
                     help="Clientes APTO na cidade — sem inadimplência, participam dos sorteios."),
                 "Pendentes": st.column_config.NumberColumn(
-                    "Pendentes", width="small",
+                    "Pendentes", width=_wnum,
                     help="Clientes NÃO APTO na cidade — com parcelas vencidas."),
                 "% Inadimpl.": st.column_config.NumberColumn(
-                    "% Inadimpl.", width="small",
+                    "% Inadimpl.", width=_wnum,
                     help="Inadimplência da cidade: pendentes ÷ total de clientes da cidade."),
                 "Cupons": st.column_config.NumberColumn(
-                    "Cupons", width="small",
+                    "Cupons", width=_wnum,
                     help="Cupons gerados pelos clientes da cidade (1 cupom por R$ 100 recebido)."),
                 "% Cupons": st.column_config.NumberColumn(
-                    "% Cupons", width="small",
+                    "% Cupons", width=_wnum,
                     help="Efeito da cidade: participação no total de cupons gerados na campanha."),
                 "Valor (R$)": st.column_config.NumberColumn(
-                    "Valor (R$)",
+                    "Valor (R$)", width=("medium" if _mob else None),
                     help="Soma do valor total recebido pelos clientes da cidade."),
             },
         )
@@ -406,19 +410,19 @@ with tabs[4]:
                 _top_fmt,
                 hide_index=True,
                 height=700,
-                width="content" if is_mobile() else "stretch",
+                width="stretch",
                 column_config={
                     "Obra": st.column_config.TextColumn("Obra", pinned=True, width="medium"),
                     "Total recebido": st.column_config.TextColumn(
-                        "Total recebido", width="small",
+                        "Total recebido", width=_wnum,
                         help="Soma de todos os pagamentos recebidos pela obra no período do snapshot.",
                     ),
                     "Cupons": st.column_config.TextColumn(
-                        "Cupons", width="small",
+                        "Cupons", width=_wnum,
                         help="Cupons gerados pelos clientes da obra. Calculado pelo Fabric: R$ recebido ÷ R$ 100 por cupom.",
                     ),
                     "Média diária": st.column_config.TextColumn(
-                        "Média diária",
+                        "Média diária", width=("medium" if _mob else None),
                         help="Recebimento médio por dia com pagamento: Total recebido ÷ dias em que houve ao menos um pagamento na obra.",
                     ),
                 },
