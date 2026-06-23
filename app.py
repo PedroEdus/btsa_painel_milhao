@@ -79,12 +79,6 @@ page_header(
     atualizado_em=ultima_atualizacao(),
 )
 
-# DEBUG TEMP — remover depois: mostra detecção de mobile + UA
-try:
-    _ua_dbg = st.context.headers.get("User-Agent", "(sem UA)")
-except Exception as _e:
-    _ua_dbg = f"(erro headers: {_e})"
-st.warning(f"🔧 DEBUG is_mobile={is_mobile()} · UA={_ua_dbg[:120]}")
 _mob = is_mobile()
 # largura das colunas numéricas das tabelas: no mobile fixa (medium) p/ forçar
 # overflow interno e travar a 1a coluna; no desktop "small" e última auto.
