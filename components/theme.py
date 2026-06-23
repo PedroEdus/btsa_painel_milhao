@@ -631,17 +631,17 @@ button[data-baseweb="tab"][aria-selected="true"] {{
 /* ── Tabela HTML mobile com 1a coluna fixa (.mtbl-*) ─────── */
 .mtbl-wrap {{ overflow-x: auto; -webkit-overflow-scrolling: touch;
   border: 1px solid {P['border']}; border-radius: 12px; }}
-.mtbl {{ border-collapse: separate; border-spacing: 0; font-size: 11.5px;
+.mtbl {{ border-collapse: separate; border-spacing: 0; font-size: 10.5px;
   width: max-content; min-width: 100%; }}
 /* min-width nas colunas força a soma a passar da tela → overflow → arrasta.
    Valores enxutos p/ caber mais colunas na tela ao mesmo tempo. */
-.mtbl th, .mtbl td {{ min-width: 64px; }}
-.mtbl th:first-child, .mtbl td:first-child {{ min-width: 96px; }}
-.mtbl th {{ text-align: left; padding: 6px 7px; background: {P['bg']};
-  color: {P['muted']}; font-size: 9.5px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .3px; white-space: nowrap;
+.mtbl th, .mtbl td {{ min-width: 46px; }}
+.mtbl th:first-child, .mtbl td:first-child {{ min-width: 76px; }}
+.mtbl th {{ text-align: left; padding: 5px 6px; background: {P['bg']};
+  color: {P['muted']}; font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .2px; white-space: nowrap;
   border-bottom: 1px solid {P['border2']}; }}
-.mtbl td {{ padding: 7px 7px; border-bottom: 1px solid {P['border']};
+.mtbl td {{ padding: 6px 6px; border-bottom: 1px solid {P['border']};
   color: {P['text']}; white-space: nowrap; }}
 .mtbl tbody tr:last-child td {{ border-bottom: none; }}
 /* 1a coluna congelada — position:sticky funciona em scroll touch no mobile */
