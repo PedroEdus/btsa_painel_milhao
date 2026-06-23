@@ -18,6 +18,20 @@ def numero(valor: float) -> str:
     return f"{valor:,.0f}".replace(",", ".")
 
 
+# Abreviações de mês em pt-BR (locale do servidor pode não ter pt_BR).
+_MESES_PT = {
+    1: "jan", 2: "fev", 3: "mar", 4: "abr", 5: "mai", 6: "jun",
+    7: "jul", 8: "ago", 9: "set", 10: "out", 11: "nov", 12: "dez",
+}
+
+
+def mes_ano_pt(ts, ano_curto: bool = False) -> str:
+    """Mês/ano abreviado pt-BR: 'mai/2026' (ou 'mai/26' se ano_curto)."""
+    mes = _MESES_PT[ts.month]
+    ano = ts.year % 100 if ano_curto else ts.year
+    return f"{mes}/{ano:02d}" if ano_curto else f"{mes}/{ano}"
+
+
 def moeda_compacta(valor: float) -> str:
     """Moeda abreviada p/ cards estreitos: R$ 3,14 bi · R$ 86,8 mi · R$ 12 mil."""
     v = float(valor or 0)

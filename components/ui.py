@@ -17,6 +17,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from components.format import (
+    mes_ano_pt,
     moeda as _moeda,
     numero as _numero,
     pct_valor,
@@ -535,9 +536,10 @@ def donut(df: pd.DataFrame, names: str, values: str, titulo: str, sub: str = "",
                 f'</div></div>'
             )
 
-        cols = st.columns([1, 1])
+        # Donut à esquerda (coluna larga p/ centralizar), legenda à direita.
+        cols = st.columns([1.7, 1])
         with cols[0]:
-            _show(fig, 320)
+            _show(fig, 320, legenda=False)
         with cols[1]:
             st.markdown(
                 '<div style="display:flex;flex-direction:column;justify-content:center;'
@@ -547,15 +549,12 @@ def donut(df: pd.DataFrame, names: str, values: str, titulo: str, sub: str = "",
 
 
 def medidor(valor: float, maximo: float, titulo: str, sub: str = "",
-            sufixo: str = "%", numformat: str | None = None) -> None:
+            sufixo: str = "%", numformat: str | None = None,
+            nota: str = "") -> None:
     with card(titulo, sub):
         P = PALETAS["claro"]
-        num = {"suffix": sufixo, "font": {"size": 36, "color": P["text"]}}
-        if numformat:
-            num["valueformat"] = numformat
         fig = go.Figure(go.Indicator(
-            mode="gauge+number", value=valor,
-            number=num,
+            mode="gauge", value=valor,
             gauge={
                 "axis": {"range": [0, maximo], "tickcolor": P["muted"],
                          "tickfont": {"color": P["muted"], "size": 10}},
@@ -564,7 +563,22 @@ def medidor(valor: float, maximo: float, titulo: str, sub: str = "",
                 "steps": [{"range": [0, maximo], "color": P["grid"]}],
             },
         ))
-        _show(fig, 320)
+        # % como anotação centralizada (número nativo do plotly fica deslocado).
+        _vfmt = (f"{{:{numformat}}}".format(valor) if numformat else f"{valor:g}")
+        fig.add_annotation(
+            text=f"<b>{_vfmt}{sufixo}</b>",
+            x=0.5, y=0.18, showarrow=False,
+            xref="paper", yref="paper", xanchor="center",
+            font=dict(size=46, color=BRAND["600"], family=_V8_FONT),
+        )
+        _show(fig, 300)
+        if nota:
+            st.markdown(
+                f'<div style="font-size:12.5px;color:#475569;line-height:1.5;'
+                f'background:#f8fafc;border:1px solid #eef1f5;border-radius:9px;'
+                f'padding:10px 13px;margin-top:2px">{nota}</div>',
+                unsafe_allow_html=True,
+            )
 
 
 def funil(df: pd.DataFrame, x: str, y: str, titulo: str, sub: str = "") -> None:
@@ -636,7 +650,7 @@ def _fmt_k(v: float) -> str:
     return str(int(v))
 
 
-def _show(fig, altura: int = 320) -> None:
+def _show(fig, altura: int = 320, legenda: bool = True) -> None:
     """Base render: grid v8, fundo transparente, font/label padronizados, tooltip estilo v8."""
     fig.update_layout(
         height=altura,
@@ -644,7 +658,7 @@ def _show(fig, altura: int = 320) -> None:
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family=_V8_FONT, color=_V8_LABEL, size=11),
         hoverlabel=_v8_hoverlabel(),
-        showlegend=True,
+        showlegend=legenda,
         legend=dict(
             orientation="h",
             yanchor="bottom", y=1.02,
@@ -712,7 +726,8 @@ def linha_temporal(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str 
             )
         fig.update_layout(
             yaxis=dict(tickformat=".2s"),
-            xaxis=dict(tickangle=0),
+            # dd/mm — neutro, evita meses em inglês do plotly (May, Jun…)
+            xaxis=dict(tickangle=0, tickformat="%d/%m"),
         )
         _show(fig)
 
@@ -802,17 +817,23 @@ def barras_cidades(df: pd.DataFrame, x: str, y: str, titulo: str, sub: str = "",
             textposition="outside",
             textangle=-90,
             text=labels,
-            textfont=dict(color="#1E293B", size=10, family=_V8_FONT),
+            textfont=dict(color="#1E293B", size=13, family=_V8_FONT),
             cliponaxis=False,
-            width=0.45,
+            width=0.55,
             name=titulo,
             hovertemplate=ht,
         )
         _maxy = float(df[y].max()) if len(df) else 1.0
+        # Monetário tem rótulo vertical mais comprido → precisa de mais headroom.
+        _topo = 2.4 if is_monetary else 1.8
         fig.update_layout(
+            # Força o tamanho do rótulo (plotly encolhe texto externo que não cabe).
+            uniformtext_minsize=13, uniformtext_mode="show",
             yaxis=dict(showgrid=True, tickformat=".2s", title="",
-                       range=[0, _maxy * 1.5]),
-            xaxis=dict(title="", tickangle=-45 if len(df) > 6 else 0),
+                       range=[0, _maxy * _topo],
+                       tickfont=dict(size=14, color="#475569", family=_V8_FONT)),
+            xaxis=dict(title="", tickangle=-45 if len(df) > 6 else 0,
+                       tickfont=dict(size=14, color="#334155", family=_V8_FONT)),
             bargap=0.5,
             hoverlabel=_v8_hoverlabel(),
         )
@@ -981,8 +1002,8 @@ def banner_premiacao() -> None:
         cls = " banner-pill-star" if i == proximo else ""
         pills.append(
             f'<div class="banner-pill{cls}">'
-            f'<span class="banner-pill-m">{mes.strftime("%b/%y")}</span>'
-            f'<span class="banner-pill-t">{mes_sor.strftime("%b/%y")} — {premio}</span>'
+            f'<span class="banner-pill-m">{mes_ano_pt(mes, ano_curto=True)}</span>'
+            f'<span class="banner-pill-t">{mes_ano_pt(mes_sor, ano_curto=True)} - {premio}</span>'
             f'</div>'
         )
     st.markdown(

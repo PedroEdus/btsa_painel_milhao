@@ -19,11 +19,13 @@ from components import (
     hero,
     linha_temporal,
     medidor,
+    mes_ano_pt,
     moeda,
     moeda_compacta,
     nota_regra,
     numero,
     page_header,
+    percentual,
     progress_adimplencia,
     ranking_cidades_tabela,
     stat_cards,
@@ -164,6 +166,21 @@ with tabs[0]:
 
 # ── Tab 1 — Análise por Cidade ────────────────────────────────────────────────
 with tabs[1]:
+    _n_cid = int(df["cidade"].nunique()) or 1
+    stat_cards([
+        {"label": "Cidades participantes", "valor": numero(_n_cid),
+         "icon": "fa-city", "cor": "blue",
+         "tooltip": "Municípios distintos com ao menos um cliente ativo no portfólio."},
+        {"label": "Cupons / cidade (média)", "valor": numero(round(m["cupons_calculados"] / _n_cid)),
+         "icon": "fa-ticket", "cor": "green",
+         "tooltip": "Média de cupons gerados por município: total de cupons ÷ número de cidades participantes."},
+        {"label": "Elegíveis / cidade (média)", "valor": numero(round(m["clientes_elegiveis"] / _n_cid)),
+         "icon": "fa-circle-check", "cor": "green",
+         "tooltip": "Média de clientes APTO por município: total de elegíveis ÷ número de cidades participantes."},
+        {"label": "Inadimplentes / cidade (média)", "valor": numero(round(m["inadimplentes"] / _n_cid)),
+         "icon": "fa-ban", "cor": "red",
+         "tooltip": "Média de clientes NÃO APTO por município: total de inadimplentes ÷ número de cidades participantes."},
+    ])
     c1, c2 = st.columns(2)
     with c1:
         barras_cidades(
@@ -206,38 +223,48 @@ with tabs[1]:
         "Valor (R$)": _totc["val"].reindex(_pivc.index).fillna(0).values,
     }).sort_values("Clientes", ascending=False).reset_index(drop=True)
 
+    # Styler: formata a EXIBIÇÃO (R$/pt-BR/%) mas mantém as colunas numéricas
+    # por baixo — assim a ordenação por clique continua numérica correta.
+    _fmt_pct = lambda v: percentual(v * 100)
+    _sty = resumo_cidade.style.format({
+        "Clientes": numero, "Elegíveis": numero, "Pendentes": numero, "Cupons": numero,
+        "Repres.": _fmt_pct, "% Inadimpl.": _fmt_pct, "% Cupons": _fmt_pct,
+        "Valor (R$)": moeda,
+    })
+
     with card("Participação por cidade",
               "Representatividade, engajamento (cupons) e inadimplência por município"):
         st.dataframe(
-            resumo_cidade,
+            _sty,
             hide_index=True,
             height=420,
             use_container_width=True,
             column_config={
-                "Cidade": st.column_config.TextColumn("Cidade"),
+                "Cidade": st.column_config.TextColumn(
+                    "Cidade"),
                 "Clientes": st.column_config.NumberColumn(
-                    "Clientes", format="localized",
+                    "Clientes",
                     help="Total de clientes únicos (CPF) com venda ativa na cidade."),
                 "Repres.": st.column_config.NumberColumn(
-                    "Repres.", format="percent",
+                    "Repres.",
                     help="Representatividade: participação da cidade no total de clientes do portfólio."),
                 "Elegíveis": st.column_config.NumberColumn(
-                    "Elegíveis", format="localized",
+                    "Elegíveis",
                     help="Clientes APTO na cidade — sem inadimplência, participam dos sorteios."),
                 "Pendentes": st.column_config.NumberColumn(
-                    "Pendentes", format="localized",
+                    "Pendentes",
                     help="Clientes NÃO APTO na cidade — com parcelas vencidas."),
                 "% Inadimpl.": st.column_config.NumberColumn(
-                    "% Inadimpl.", format="percent",
+                    "% Inadimpl.",
                     help="Inadimplência da cidade: pendentes ÷ total de clientes da cidade."),
                 "Cupons": st.column_config.NumberColumn(
-                    "Cupons", format="localized",
+                    "Cupons",
                     help="Cupons gerados pelos clientes da cidade (1 cupom por R$ 100 recebido)."),
                 "% Cupons": st.column_config.NumberColumn(
-                    "% Cupons", format="percent",
+                    "% Cupons",
                     help="Efeito da cidade: participação no total de cupons gerados na campanha."),
                 "Valor (R$)": st.column_config.NumberColumn(
-                    "Valor (R$)", format="localized",
+                    "Valor (R$)",
                     help="Soma do valor total recebido pelos clientes da cidade."),
             },
         )
@@ -282,7 +309,7 @@ with tabs[2]:
                                skip_card=True)
             else:
                 _men = recebimento_mensal(df).copy()
-                _men["data"] = _men["data"].dt.strftime("%b/%Y")
+                _men["data"] = _men["data"].apply(mes_ano_pt)
                 barras(_men, "data", "valor_total_recebido", "",
                        is_monetary=True, skip_card=True)
 
@@ -395,9 +422,16 @@ with tabs[4]:
         )
         _pct_cupons = 100 * cupons_realizados / max(cupons_limite, 1)
         medidor(_pct_cupons, 100,
-                "Cupons gerados vs potencial",
-                f"{numero(cupons_realizados)} de {numero(cupons_limite)} cupons possíveis pela receita",
-                sufixo="%", numformat=".1f")
+                "Aproveitamento de cupons",
+                "Quanto dos cupons possíveis já foi gerado",
+                sufixo="%", numformat=".1f",
+                nota=(
+                    f"<b>{numero(cupons_realizados)}</b> cupons já gerados de "
+                    f"<b>{numero(cupons_limite)}</b> possíveis.<br>"
+                    "<b>Potencial</b> = (valor recebido + saldo a receber da carteira) "
+                    "÷ R$ 100 por cupom. Mostra o quanto a campanha pode crescer "
+                    "conforme a carteira é paga."
+                ))
         donut(recebimento_por_classificacao(df), "classificacao_recebimento",
               "valor_total_recebido", "Composição do recebimento", "Normal vs recuperação",
               cores={"normal": "#2a9d45", "recuperacao": "#f59e0b"})

@@ -186,7 +186,7 @@ h1, h2, h3 {{ font-weight:800 !important; color:{P['text']}; letter-spacing:-.3p
 /* ── Stat cards ────────────────────────────────────────────── */
 .stats-row {{ display:grid; grid-template-columns:repeat(auto-fit, minmax(225px,1fr)); gap:16px; margin-bottom:8px; }}
 .stat-card {{ background:{P['surface']}; border:1px solid {P['border']}; border-radius:{RADIUS['lg']};
-  padding:20px 22px; box-shadow:{P['shadow']}; position:relative; overflow:hidden;
+  padding:20px 22px; box-shadow:{P['shadow']}; position:relative; overflow:visible;
   transition: box-shadow 150ms cubic-bezier(.4,0,.2,1), transform 150ms cubic-bezier(.4,0,.2,1),
               background-color .45s ease, border-color .45s ease; }}
 .stat-card::before {{ content:''; position:absolute; top:0; left:0; right:0; height:3px;
@@ -194,7 +194,7 @@ h1, h2, h3 {{ font-weight:800 !important; color:{P['text']}; letter-spacing:-.3p
 .stat-card.amber::before {{ background: linear-gradient(90deg, {ACENTO['amber']}, #fbbf24); }}
 .stat-card.red::before   {{ background: linear-gradient(90deg, {ACENTO['red']}, #f87171); }}
 .stat-card.blue::before  {{ background: linear-gradient(90deg, {ACENTO['blue']}, #60a5fa); }}
-.stat-card:hover {{ box-shadow:{P['shadow_h']}; transform:translateY(-2px); border-color:{P['border2']}; }}
+.stat-card:hover {{ box-shadow:{P['shadow_h']}; transform:translateY(-2px); border-color:{P['border2']}; z-index:1000; }}
 .stat-top {{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }}
 .stat-top > div:first-child {{ flex:1; min-width:0; }}
 .stat-icon {{ width:44px; height:44px; border-radius:12px; flex-shrink:0; display:flex;
@@ -614,6 +614,8 @@ button[data-baseweb="tab"][aria-selected="true"] {{
   .stat-icon {{ width:50px; height:50px; font-size:21px; }}
   .card-title {{ font-size:16px; }}
 }}
+/* Respiro entre a barra de abas e o conteúdo */
+.stTabs [data-baseweb="tab-panel"] {{ padding-top:10px; }}
 </style>
 """
 

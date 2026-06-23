@@ -15,6 +15,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from components.format import mes_ano_pt
 from config.settings import CAMPANHA, REGRA_CUPOM
 
 
@@ -292,8 +293,8 @@ def calendario_sorteios() -> pd.DataFrame:
         else:
             status = "Futuro"
         rows.append({
-            "Pagamento": mes_pag.strftime("%b/%Y"),
-            "Sorteio": mes_sor.strftime("%b/%Y"),
+            "Pagamento": mes_ano_pt(mes_pag),
+            "Sorteio": mes_ano_pt(mes_sor),
             "Prêmio": premio,
             "Status": status,
             "_final": is_final,
