@@ -79,6 +79,13 @@ page_header(
     atualizado_em=ultima_atualizacao(),
 )
 
+# DEBUG TEMP — remover depois: mostra detecção de mobile + UA
+try:
+    _ua_dbg = st.context.headers.get("User-Agent", "(sem UA)")
+except Exception as _e:
+    _ua_dbg = f"(erro headers: {_e})"
+st.caption(f"🔧 is_mobile={is_mobile()} · UA={_ua_dbg[:90]}")
+
 if not resultado.ok:
     for erro in resultado.erros:
         st.error(erro)
