@@ -23,6 +23,7 @@ from components import (
     moeda,
     moeda_compacta,
     nota_regra,
+    is_mobile,
     numero,
     page_header,
     percentual,
@@ -238,7 +239,7 @@ with tabs[1]:
             _sty,
             hide_index=True,
             height=420,
-            width="stretch",
+            width="content" if is_mobile() else "stretch",
             column_config={
                 "Cidade": st.column_config.TextColumn(
                     "Cidade", pinned=True, width="medium"),
@@ -398,7 +399,7 @@ with tabs[4]:
                 _top_fmt,
                 hide_index=True,
                 height=700,
-                width="stretch",
+                width="content" if is_mobile() else "stretch",
                 column_config={
                     "Obra": st.column_config.TextColumn("Obra", pinned=True, width="medium"),
                     "Total recebido": st.column_config.TextColumn(

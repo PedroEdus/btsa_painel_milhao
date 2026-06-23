@@ -1042,6 +1042,21 @@ def _estilo_celula(v) -> str:
     return f"background-color:{bg};color:{fg};font-weight:600;border-radius:6px;"
 
 
+def is_mobile() -> bool:
+    """Detecta celular via User-Agent (st.context.headers, server-side).
+
+    Usado p/ alternar a largura das tabelas: no mobile usa width="content"
+    (gera overflow horizontal → scroll → a 1a coluna pinned fica fixa); no
+    desktop usa width="stretch" (preenche o container). UA pode mentir, mas
+    é o suficiente p/ esse ajuste de layout.
+    """
+    try:
+        ua = st.context.headers.get("User-Agent", "") or ""
+    except Exception:
+        return False
+    return any(k in ua for k in ("Mobile", "Android", "iPhone", "iPad", "iPod"))
+
+
 def tabela(df: pd.DataFrame, titulo: str = "", sub: str = "", status: bool = True,
            altura: int | None = None, pin_primeira: bool = True) -> None:
     """Tabela com coloração semântica nas colunas de status (CGID .status-badge).
@@ -1071,10 +1086,11 @@ def tabela(df: pd.DataFrame, titulo: str = "", sub: str = "", status: bool = Tru
             for c in _visiveis[1:-1]:
                 col_cfg[c] = st.column_config.Column(width="small")
 
+    _w = "content" if is_mobile() else "stretch"
     if titulo:
         with card(titulo, sub):
-            st.dataframe(obj, hide_index=True, width="stretch", height=altura,
+            st.dataframe(obj, hide_index=True, width=_w, height=altura,
                          column_config=col_cfg)
     else:
-        st.dataframe(obj, hide_index=True, width="stretch", height=altura,
+        st.dataframe(obj, hide_index=True, width=_w, height=altura,
                      column_config=col_cfg)
