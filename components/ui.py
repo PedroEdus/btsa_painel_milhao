@@ -1063,7 +1063,13 @@ def tabela(df: pd.DataFrame, titulo: str = "", sub: str = "", status: bool = Tru
     if pin_primeira:
         _visiveis = [c for c in df.columns if c not in _COLS_STATUS]
         if _visiveis:
+            # 1a coluna: fixa (pinned) com largura fixa. Colunas do meio também
+            # com largura fixa p/ a soma exceder a tela do celular → overflow →
+            # scroll horizontal → a 1a fica realmente fixa no mobile. A última
+            # fica sem width: estica p/ preencher o container no desktop.
             col_cfg = {_visiveis[0]: st.column_config.Column(pinned=True, width="medium")}
+            for c in _visiveis[1:-1]:
+                col_cfg[c] = st.column_config.Column(width="small")
 
     if titulo:
         with card(titulo, sub):

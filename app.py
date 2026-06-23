@@ -243,25 +243,25 @@ with tabs[1]:
                 "Cidade": st.column_config.TextColumn(
                     "Cidade", pinned=True, width="medium"),
                 "Clientes": st.column_config.NumberColumn(
-                    "Clientes",
+                    "Clientes", width="small",
                     help="Total de clientes únicos (CPF) com venda ativa na cidade."),
                 "Repres.": st.column_config.NumberColumn(
-                    "Repres.",
+                    "Repres.", width="small",
                     help="Representatividade: participação da cidade no total de clientes do portfólio."),
                 "Elegíveis": st.column_config.NumberColumn(
-                    "Elegíveis",
+                    "Elegíveis", width="small",
                     help="Clientes APTO na cidade — sem inadimplência, participam dos sorteios."),
                 "Pendentes": st.column_config.NumberColumn(
-                    "Pendentes",
+                    "Pendentes", width="small",
                     help="Clientes NÃO APTO na cidade — com parcelas vencidas."),
                 "% Inadimpl.": st.column_config.NumberColumn(
-                    "% Inadimpl.",
+                    "% Inadimpl.", width="small",
                     help="Inadimplência da cidade: pendentes ÷ total de clientes da cidade."),
                 "Cupons": st.column_config.NumberColumn(
-                    "Cupons",
+                    "Cupons", width="small",
                     help="Cupons gerados pelos clientes da cidade (1 cupom por R$ 100 recebido)."),
                 "% Cupons": st.column_config.NumberColumn(
-                    "% Cupons",
+                    "% Cupons", width="small",
                     help="Efeito da cidade: participação no total de cupons gerados na campanha."),
                 "Valor (R$)": st.column_config.NumberColumn(
                     "Valor (R$)",
@@ -402,11 +402,11 @@ with tabs[4]:
                 column_config={
                     "Obra": st.column_config.TextColumn("Obra", pinned=True, width="medium"),
                     "Total recebido": st.column_config.TextColumn(
-                        "Total recebido",
+                        "Total recebido", width="small",
                         help="Soma de todos os pagamentos recebidos pela obra no período do snapshot.",
                     ),
                     "Cupons": st.column_config.TextColumn(
-                        "Cupons",
+                        "Cupons", width="small",
                         help="Cupons gerados pelos clientes da obra. Calculado pelo Fabric: R$ recebido ÷ R$ 100 por cupom.",
                     ),
                     "Média diária": st.column_config.TextColumn(
