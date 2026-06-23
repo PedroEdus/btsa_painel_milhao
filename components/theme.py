@@ -478,8 +478,7 @@ button[data-baseweb="tab"][aria-selected="true"] {{
   .card-title {{ font-size:13.5px; }}
   /* Tabelas: encolhe o conteúdo (canvas não aceita font-size via CSS) p/ caber
      mais colunas. Largura compensada p/ preencher o container após o scale. */
-  [data-testid="stDataFrame"] {{ transform:scale(0.72); transform-origin:top left;
-    width:138.8% !important; }}
+  [data-testid="stDataFrame"] {{ transform:scale(0.82); transform-origin:top left; }}
 }}
 @media (max-width: 420px) {{
   .stats-row {{ grid-template-columns:1fr; }}

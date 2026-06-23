@@ -1067,8 +1067,8 @@ def tabela(df: pd.DataFrame, titulo: str = "", sub: str = "", status: bool = Tru
 
     if titulo:
         with card(titulo, sub):
-            st.dataframe(obj, hide_index=True, width="stretch", height=altura,
+            st.dataframe(obj, hide_index=True, width="content", height=altura,
                          column_config=col_cfg)
     else:
-        st.dataframe(obj, hide_index=True, width="stretch", height=altura,
+        st.dataframe(obj, hide_index=True, width="content", height=altura,
                      column_config=col_cfg)
