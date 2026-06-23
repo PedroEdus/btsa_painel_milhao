@@ -84,7 +84,7 @@ try:
     _ua_dbg = st.context.headers.get("User-Agent", "(sem UA)")
 except Exception as _e:
     _ua_dbg = f"(erro headers: {_e})"
-st.caption(f"🔧 is_mobile={is_mobile()} · UA={_ua_dbg[:90]}")
+st.warning(f"🔧 DEBUG is_mobile={is_mobile()} · UA={_ua_dbg[:120]}")
 
 if not resultado.ok:
     for erro in resultado.erros:
