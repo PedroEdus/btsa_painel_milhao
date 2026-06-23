@@ -1055,12 +1055,14 @@ def tabela(df: pd.DataFrame, titulo: str = "", sub: str = "", status: bool = Tru
     else:
         obj = df
 
-    # Congela a 1ª coluna visível (ignora colunas técnicas de status, ex. badge).
+    # Congela a 1ª coluna visível (ignora colunas técnicas de status, ex. badge)
+    # com largura fixa (medium) — evita que nomes longos estourem a tela e
+    # bloqueiem a rolagem das demais colunas. Texto longo é truncado.
     col_cfg = None
     if pin_primeira:
         _visiveis = [c for c in df.columns if c not in _COLS_STATUS]
         if _visiveis:
-            col_cfg = {_visiveis[0]: st.column_config.Column(pinned=True)}
+            col_cfg = {_visiveis[0]: st.column_config.Column(pinned=True, width="medium")}
 
     if titulo:
         with card(titulo, sub):

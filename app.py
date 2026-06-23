@@ -400,7 +400,7 @@ with tabs[4]:
                 height=700,
                 use_container_width=True,
                 column_config={
-                    "Obra": st.column_config.TextColumn("Obra", pinned=True),
+                    "Obra": st.column_config.TextColumn("Obra", pinned=True, width="medium"),
                     "Total recebido": st.column_config.TextColumn(
                         "Total recebido",
                         help="Soma de todos os pagamentos recebidos pela obra no período do snapshot.",
