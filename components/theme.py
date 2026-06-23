@@ -476,9 +476,9 @@ button[data-baseweb="tab"][aria-selected="true"] {{
   .banner-pill-m {{ font-size:10px; letter-spacing:.3px; }}
   .banner-pill-t {{ font-size:11.5px; }}
   .card-title {{ font-size:13.5px; }}
-  /* Tabelas: encolhe o conteúdo (canvas não aceita font-size via CSS) p/ caber
-     mais colunas. Largura compensada p/ preencher o container após o scale. */
-  [data-testid="stDataFrame"] {{ transform:scale(0.82); transform-origin:top left; }}
+  /* Tabelas: sem transform:scale — quebra a coluna fixa (pinned) do canvas
+     glide-data-grid (a camada sticky é posicionada via getBoundingClientRect,
+     distorcida pelo transform → coluna some). Usa scroll horizontal nativo. */
 }}
 @media (max-width: 420px) {{
   .stats-row {{ grid-template-columns:1fr; }}
