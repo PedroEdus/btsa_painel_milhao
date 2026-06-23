@@ -680,8 +680,10 @@ def _show(fig, altura: int = 320, legenda: bool = True) -> None:
     fig.update_xaxes(**_eixo, showgrid=False)
     fig.update_yaxes(**_eixo)
     _show_counter[0] += 1
+    # staticPlot: gráfico sem interação (toque/scroll não agarram). Rótulos já
+    # mostram os valores, então o hover não faz falta. Tabelas seguem interativas.
     st.plotly_chart(fig, key=f"chart_{_show_counter[0]}", width="stretch",
-                    config={"displayModeBar": False})
+                    config={"displayModeBar": False, "staticPlot": True})
 
 
 def linha_temporal(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str = "",
@@ -1041,10 +1043,11 @@ def _estilo_celula(v) -> str:
 
 
 def tabela(df: pd.DataFrame, titulo: str = "", sub: str = "", status: bool = True,
-           altura: int | None = None) -> None:
+           altura: int | None = None, pin_primeira: bool = True) -> None:
     """Tabela com coloração semântica nas colunas de status (CGID .status-badge).
 
     altura: altura fixa em px (None = automática do Streamlit).
+    pin_primeira: congela a 1ª coluna (fica fixa ao rolar na horizontal).
     """
     if status:
         cols = [c for c in _COLS_STATUS if c in df.columns]
@@ -1052,8 +1055,17 @@ def tabela(df: pd.DataFrame, titulo: str = "", sub: str = "", status: bool = Tru
     else:
         obj = df
 
+    # Congela a 1ª coluna visível (ignora colunas técnicas de status, ex. badge).
+    col_cfg = None
+    if pin_primeira:
+        _visiveis = [c for c in df.columns if c not in _COLS_STATUS]
+        if _visiveis:
+            col_cfg = {_visiveis[0]: st.column_config.Column(pinned=True)}
+
     if titulo:
         with card(titulo, sub):
-            st.dataframe(obj, hide_index=True, width="stretch", height=altura)
+            st.dataframe(obj, hide_index=True, width="stretch", height=altura,
+                         column_config=col_cfg)
     else:
-        st.dataframe(obj, hide_index=True, width="stretch", height=altura)
+        st.dataframe(obj, hide_index=True, width="stretch", height=altura,
+                     column_config=col_cfg)

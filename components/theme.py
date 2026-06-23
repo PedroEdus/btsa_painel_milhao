@@ -470,7 +470,11 @@ button[data-baseweb="tab"][aria-selected="true"] {{
   .hero-chip {{ font-size:11.5px; }}
   .banner-prem {{ flex-direction:column; gap:12px; }}
   .banner-prem-h {{ font-size:15px; }}
-  .banner-pill {{ min-width:104px; padding:8px 12px; }}
+  /* 2 pills por linha no mobile */
+  .banner-pills {{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }}
+  .banner-pill {{ min-width:0; padding:7px 8px; }}
+  .banner-pill-m {{ font-size:10px; letter-spacing:.3px; }}
+  .banner-pill-t {{ font-size:11.5px; }}
   .card-title {{ font-size:13.5px; }}
 }}
 @media (max-width: 420px) {{
