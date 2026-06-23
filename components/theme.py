@@ -447,10 +447,12 @@ button[data-baseweb="tab"][aria-selected="true"] {{
   background: {P['bg']} !important; }}
 
 @media (max-width: 720px) {{
-  .block-container {{ padding: 1rem 1rem 1.4rem !important; }}
+  .block-container {{ padding: 0.75rem 0.85rem 1.4rem !important; }}
+  /* st.columns empilham em 1 coluna */
   [data-testid="stHorizontalBlock"] {{ flex-direction:column; gap:14px; }}
   [data-testid="stHorizontalBlock"] > div {{ width:100% !important; flex:1 1 100% !important; }}
   .stats-row {{ grid-template-columns:1fr 1fr; gap:12px; }}
+  /* Header empilhado */
   .ph {{ flex-direction:column; }}
   .ph-actions {{ transform:none; align-self:flex-start; }}
   .ph-title {{ font-size:20px; }}
@@ -458,8 +460,24 @@ button[data-baseweb="tab"][aria-selected="true"] {{
   .stat-card {{ padding:16px 16px; }}
   .stat-val {{ font-size:24px; letter-spacing:-.2px; }}
   .stat-icon {{ width:38px; height:38px; font-size:15px; }}
+  /* Abas: rolagem horizontal sem quebrar, sticky no topo correto */
+  [data-baseweb="tab-list"] {{ top:0 !important; overflow-x:auto !important;
+    flex-wrap:nowrap !important; -webkit-overflow-scrolling:touch; }}
+  button[data-baseweb="tab"] {{ white-space:nowrap !important; font-size:13px !important; }}
+  /* Hero / banner mais compactos */
+  .hero-inner {{ padding:18px 18px; }}
+  .hero-chips {{ gap:7px; }}
+  .hero-chip {{ font-size:11.5px; }}
+  .banner-prem {{ flex-direction:column; gap:12px; }}
+  .banner-prem-h {{ font-size:15px; }}
+  .banner-pill {{ min-width:104px; padding:8px 12px; }}
+  .card-title {{ font-size:13.5px; }}
 }}
-@media (max-width: 420px) {{ .stats-row {{ grid-template-columns:1fr; }} }}
+@media (max-width: 420px) {{
+  .stats-row {{ grid-template-columns:1fr; }}
+  .hero-value {{ font-size:24px !important; }}
+  .banner-pills {{ gap:8px; }}
+}}
 
 /* ── Reveal animation (bars, rank fills) ────────────────── */
 @keyframes revealFill {{
