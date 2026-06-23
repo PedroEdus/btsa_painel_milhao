@@ -6,7 +6,9 @@ components.theme (Font Awesome p/ ícones).
 from __future__ import annotations
 
 import base64
+import html as _html
 import os
+import re as _re
 from contextlib import contextmanager, nullcontext as _null_ctx
 from datetime import datetime
 
@@ -1045,16 +1047,63 @@ def _estilo_celula(v) -> str:
 def is_mobile() -> bool:
     """Detecta celular via User-Agent (st.context.headers, server-side).
 
-    Usado p/ alternar a largura das tabelas: no mobile usa width="content"
-    (gera overflow horizontal → scroll → a 1a coluna pinned fica fixa); no
-    desktop usa width="stretch" (preenche o container). UA pode mentir, mas
-    é o suficiente p/ esse ajuste de layout.
+    Usado p/ escolher o tipo de tabela: no mobile usa HTML com 1a coluna
+    sticky (trava em scroll touch); no desktop usa st.dataframe (interativo,
+    pinned funciona). UA pode mentir, mas é o suficiente p/ esse ajuste.
     """
     try:
         ua = st.context.headers.get("User-Agent", "") or ""
     except Exception:
         return False
     return any(k in ua for k in ("Mobile", "Android", "iPhone", "iPad", "iPod"))
+
+
+_NUM_RE = _re.compile(r"^[\sR$+\-]*[\d.,]+\s*%?\s*$")
+
+
+def _col_numerica(serie) -> bool:
+    """Coluna é numérica (alinha à direita) se todas as células não vazias
+    parecem número/moeda/percentual (ex: 1.234, R$ 10,00, 12,3%)."""
+    vals = [str(x) for x in serie if str(x).strip() != ""]
+    return bool(vals) and all(_NUM_RE.match(v) for v in vals)
+
+
+def _tabela_html_body(df: pd.DataFrame, status_cols: tuple = ()) -> str:
+    """Monta uma <table> HTML com a 1a coluna fixa (sticky). As células devem
+    já vir formatadas como string. Colunas em status_cols recebem badge colorido
+    (mesmas cores do st.dataframe, via _estilo_celula). Numéricos à direita."""
+    cols = list(df.columns)
+    _align = {c: ("right" if (i != 0 and c not in status_cols and _col_numerica(df[c]))
+                  else "left") for i, c in enumerate(cols)}
+    ths = "".join(
+        f'<th style="text-align:{_align[c]}">{_html.escape(str(c))}</th>' for c in cols)
+    linhas = []
+    for _, row in df.iterrows():
+        tds = []
+        for c in cols:
+            v = row[c]
+            txt = _html.escape("" if v is None else str(v))
+            if c in status_cols:
+                sty = _estilo_celula(v)
+                cell = f'<span class="mtbl-badge" style="{sty}">{txt}</span>' if sty else txt
+                tds.append(f'<td>{cell}</td>')
+            else:
+                tds.append(f'<td style="text-align:{_align[c]}">{txt}</td>')
+        linhas.append(f"<tr>{''.join(tds)}</tr>")
+    return (f'<div class="mtbl-wrap"><table class="mtbl"><thead><tr>{ths}</tr>'
+            f'</thead><tbody>{"".join(linhas)}</tbody></table></div>')
+
+
+def tabela_html(df: pd.DataFrame, titulo: str = "", sub: str = "",
+                status_cols: tuple = ()) -> None:
+    """Versão HTML da tabela p/ mobile: 1a coluna fica fixa em scroll touch
+    (position:sticky), o que o st.dataframe/glide-grid não faz no celular."""
+    corpo = _tabela_html_body(df, status_cols)
+    if titulo:
+        with card(titulo, sub):
+            st.markdown(corpo, unsafe_allow_html=True)
+    else:
+        st.markdown(corpo, unsafe_allow_html=True)
 
 
 def tabela(df: pd.DataFrame, titulo: str = "", sub: str = "", status: bool = True,
@@ -1064,33 +1113,32 @@ def tabela(df: pd.DataFrame, titulo: str = "", sub: str = "", status: bool = Tru
     altura: altura fixa em px (None = automática do Streamlit).
     pin_primeira: congela a 1ª coluna (fica fixa ao rolar na horizontal).
     """
+    _mob = is_mobile()
+    # Mobile: tabela HTML com 1a coluna sticky (trava em touch — o pinned do
+    # st.dataframe não segura no celular). Desktop segue com st.dataframe.
+    if _mob and pin_primeira:
+        _scols = tuple(c for c in _COLS_STATUS if c in df.columns) if status else ()
+        tabela_html(df, titulo, sub, _scols)
+        return
+
     if status:
         cols = [c for c in _COLS_STATUS if c in df.columns]
         obj = df.style.map(_estilo_celula, subset=cols) if cols else df
     else:
         obj = df
 
-    # Só a 1ª coluna visível tem largura fixa (medium) e fica congelada (pinned);
-    # as demais ficam sem width p/ expandir e preencher o container no desktop
-    # (width="stretch"). No mobile o container é estreito → colunas encolhem e
-    # rola na horizontal, com a 1ª fixa. (ignora colunas técnicas de status.)
-    _mob = is_mobile()
+    # Desktop: 1a coluna fixa (pinned) com largura medium; colunas do meio com
+    # largura small; a última fica sem width e estica p/ preencher o container
+    # (width="stretch"), sem sobra à direita. (ignora colunas técnicas de status.)
     col_cfg = None
     if pin_primeira:
         _visiveis = [c for c in df.columns if c not in _COLS_STATUS]
         if _visiveis:
-            # 1a coluna: fixa (pinned). No mobile TODAS as demais ganham largura
-            # fixa → a soma excede a tela → a grade rola INTERNAMENTE (não a
-            # página) → a 1a coluna pinned fica realmente fixa. No desktop a
-            # última fica sem width e estica p/ preencher o container (sem sobra).
             col_cfg = {_visiveis[0]: st.column_config.Column(pinned=True, width="medium")}
-            _mids = _visiveis[1:]
-            _fix = _mids if _mob else _mids[:-1]
-            _wcol = "medium" if _mob else "small"
-            for c in _fix:
-                col_cfg[c] = st.column_config.Column(width=_wcol)
+            for c in _visiveis[1:-1]:
+                col_cfg[c] = st.column_config.Column(width="small")
 
-    _w = "stretch"  # prende a grade na largura do container → scroll interno
+    _w = "stretch"  # prende a grade na largura do container → preenche
     if titulo:
         with card(titulo, sub):
             st.dataframe(obj, hide_index=True, width=_w, height=altura,

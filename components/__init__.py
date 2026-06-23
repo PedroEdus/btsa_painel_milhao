@@ -46,6 +46,7 @@ from components.ui import (
     splash,
     stat_cards,
     tabela,
+    tabela_html,
     tema_toggle,
 )
 
@@ -54,7 +55,7 @@ __all__ = [
     "mascarar_cpf", "mascarar_telefone", "mascarar_email",
     "page_header", "stat_cards", "card", "badge", "logo", "splash", "auto_refresh", "tema_toggle",
     "hero", "donut", "medidor", "funil", "comparativo_carteira", "nota_regra",
-    "barras", "barras_cidades", "linha_temporal", "tabela", "selo_calculado_vs_oficial", "is_mobile",
+    "barras", "barras_cidades", "linha_temporal", "tabela", "tabela_html", "selo_calculado_vs_oficial", "is_mobile",
     "banner_premiacao", "progress_adimplencia", "ranking_cidades", "ranking_cidades_tabela", "calendario_sorteios_comp",
     "aplicar_tema", "BRAND", "BRAND_RED", "GRAY", "COLORWAY",
     "SEMANTIC", "RADIUS", "SHADOW", "FAVICON",

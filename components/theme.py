@@ -628,6 +628,24 @@ button[data-baseweb="tab"][aria-selected="true"] {{
 .cal-soon   {{ background: {SEMANTIC['warning_50']};   color: {SEMANTIC['warning_700']};   border: 1px solid #fde68a; }}
 .cal-future {{ background: {P['neutral_bg']};          color: {P['muted']};                border: 1px solid {P['border2']}; }}
 .cal-final  {{ background: {SEMANTIC['danger_50']};    color: {SEMANTIC['danger_700']};    border: 1px solid #fecaca; }}
+/* ── Tabela HTML mobile com 1a coluna fixa (.mtbl-*) ─────── */
+.mtbl-wrap {{ overflow-x: auto; -webkit-overflow-scrolling: touch;
+  border: 1px solid {P['border']}; border-radius: 12px; }}
+.mtbl {{ border-collapse: separate; border-spacing: 0; font-size: 12.5px;
+  width: max-content; min-width: 100%; }}
+.mtbl th {{ text-align: left; padding: 8px 11px; background: {P['bg']};
+  color: {P['muted']}; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .4px; white-space: nowrap;
+  border-bottom: 1px solid {P['border2']}; }}
+.mtbl td {{ padding: 9px 11px; border-bottom: 1px solid {P['border']};
+  color: {P['text']}; white-space: nowrap; }}
+.mtbl tbody tr:last-child td {{ border-bottom: none; }}
+/* 1a coluna congelada — position:sticky funciona em scroll touch no mobile */
+.mtbl th:first-child, .mtbl td:first-child {{
+  position: sticky; left: 0; z-index: 2; background: {P['surface']};
+  box-shadow: 1px 0 0 {P['border']}; }}
+.mtbl thead th:first-child {{ z-index: 3; background: {P['bg']}; }}
+.mtbl-badge {{ padding: 2px 8px; border-radius: 6px; font-weight: 600; }}
 @media (min-width: 1700px) {{
   .block-container {{ max-width:100% !important; padding:0.1rem 3rem 2.4rem !important; }}
   .ph-title {{ font-size:30px; }}

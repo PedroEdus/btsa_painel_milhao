@@ -31,6 +31,7 @@ from components import (
     ranking_cidades_tabela,
     stat_cards,
     tabela,
+    tabela_html,
 )
 from components.ui import autoplay_tabs
 from config.settings import CACHE_TTL_SEGUNDOS, CAMPANHA, CUPONS_DISPONIVEIS, REGRA_CUPOM
@@ -79,10 +80,7 @@ page_header(
     atualizado_em=ultima_atualizacao(),
 )
 
-_mob = is_mobile()
-# largura das colunas numéricas das tabelas: no mobile fixa (medium) p/ forçar
-# overflow interno e travar a 1a coluna; no desktop "small" e última auto.
-_wnum = "medium" if _mob else "small"
+_mob = is_mobile()  # mobile usa tabelas HTML c/ 1a coluna fixa; desktop usa st.dataframe
 
 if not resultado.ok:
     for erro in resultado.erros:
@@ -240,40 +238,51 @@ with tabs[1]:
 
     with card("Participação por cidade",
               "Representatividade, engajamento (cupons) e inadimplência por município"):
-        st.dataframe(
-            _sty,
-            hide_index=True,
-            height=420,
-            width="stretch",
-            column_config={
-                "Cidade": st.column_config.TextColumn(
-                    "Cidade", pinned=True, width="medium"),
-                "Clientes": st.column_config.NumberColumn(
-                    "Clientes", width=_wnum,
-                    help="Total de clientes únicos (CPF) com venda ativa na cidade."),
-                "Repres.": st.column_config.NumberColumn(
-                    "Repres.", width=_wnum,
-                    help="Representatividade: participação da cidade no total de clientes do portfólio."),
-                "Elegíveis": st.column_config.NumberColumn(
-                    "Elegíveis", width=_wnum,
-                    help="Clientes APTO na cidade — sem inadimplência, participam dos sorteios."),
-                "Pendentes": st.column_config.NumberColumn(
-                    "Pendentes", width=_wnum,
-                    help="Clientes NÃO APTO na cidade — com parcelas vencidas."),
-                "% Inadimpl.": st.column_config.NumberColumn(
-                    "% Inadimpl.", width=_wnum,
-                    help="Inadimplência da cidade: pendentes ÷ total de clientes da cidade."),
-                "Cupons": st.column_config.NumberColumn(
-                    "Cupons", width=_wnum,
-                    help="Cupons gerados pelos clientes da cidade (1 cupom por R$ 100 recebido)."),
-                "% Cupons": st.column_config.NumberColumn(
-                    "% Cupons", width=_wnum,
-                    help="Efeito da cidade: participação no total de cupons gerados na campanha."),
-                "Valor (R$)": st.column_config.NumberColumn(
-                    "Valor (R$)", width=("medium" if _mob else None),
-                    help="Soma do valor total recebido pelos clientes da cidade."),
-            },
-        )
+        if _mob:
+            # Mobile: HTML com 1a coluna fixa (sticky). Formata os números aqui
+            # já que a tabela HTML usa strings prontas.
+            _disp_cid = resumo_cidade.copy()
+            for _c in ("Clientes", "Elegíveis", "Pendentes", "Cupons"):
+                _disp_cid[_c] = _disp_cid[_c].map(numero)
+            for _c in ("Repres.", "% Inadimpl.", "% Cupons"):
+                _disp_cid[_c] = _disp_cid[_c].map(_fmt_pct)
+            _disp_cid["Valor (R$)"] = _disp_cid["Valor (R$)"].map(moeda)
+            tabela_html(_disp_cid)
+        else:
+            st.dataframe(
+                _sty,
+                hide_index=True,
+                height=420,
+                width="stretch",
+                column_config={
+                    "Cidade": st.column_config.TextColumn(
+                        "Cidade", pinned=True, width="medium"),
+                    "Clientes": st.column_config.NumberColumn(
+                        "Clientes", width="small",
+                        help="Total de clientes únicos (CPF) com venda ativa na cidade."),
+                    "Repres.": st.column_config.NumberColumn(
+                        "Repres.", width="small",
+                        help="Representatividade: participação da cidade no total de clientes do portfólio."),
+                    "Elegíveis": st.column_config.NumberColumn(
+                        "Elegíveis", width="small",
+                        help="Clientes APTO na cidade — sem inadimplência, participam dos sorteios."),
+                    "Pendentes": st.column_config.NumberColumn(
+                        "Pendentes", width="small",
+                        help="Clientes NÃO APTO na cidade — com parcelas vencidas."),
+                    "% Inadimpl.": st.column_config.NumberColumn(
+                        "% Inadimpl.", width="small",
+                        help="Inadimplência da cidade: pendentes ÷ total de clientes da cidade."),
+                    "Cupons": st.column_config.NumberColumn(
+                        "Cupons", width="small",
+                        help="Cupons gerados pelos clientes da cidade (1 cupom por R$ 100 recebido)."),
+                    "% Cupons": st.column_config.NumberColumn(
+                        "% Cupons", width="small",
+                        help="Efeito da cidade: participação no total de cupons gerados na campanha."),
+                    "Valor (R$)": st.column_config.NumberColumn(
+                        "Valor (R$)",
+                        help="Soma do valor total recebido pelos clientes da cidade."),
+                },
+            )
 
 # ── Tab 2 — Funil da Campanha ─────────────────────────────────────────────────
 with tabs[2]:
@@ -400,27 +409,30 @@ with tabs[4]:
             "Média diária": [moeda(v) for v in _top["media_diaria"]],
         })
         with card("Ranking de obras por arrecadação", "Empreendimentos com maior volume de recebimentos"):
-            st.dataframe(
-                _top_fmt,
-                hide_index=True,
-                height=700,
-                width="stretch",
-                column_config={
-                    "Obra": st.column_config.TextColumn("Obra", pinned=True, width="medium"),
-                    "Total recebido": st.column_config.TextColumn(
-                        "Total recebido", width=_wnum,
-                        help="Soma de todos os pagamentos recebidos pela obra no período do snapshot.",
-                    ),
-                    "Cupons": st.column_config.TextColumn(
-                        "Cupons", width=_wnum,
-                        help="Cupons gerados pelos clientes da obra. Calculado pelo Fabric: R$ recebido ÷ R$ 100 por cupom.",
-                    ),
-                    "Média diária": st.column_config.TextColumn(
-                        "Média diária", width=("medium" if _mob else None),
-                        help="Recebimento médio por dia com pagamento: Total recebido ÷ dias em que houve ao menos um pagamento na obra.",
-                    ),
-                },
-            )
+            if _mob:
+                tabela_html(_top_fmt)  # HTML c/ 1a coluna fixa no mobile
+            else:
+                st.dataframe(
+                    _top_fmt,
+                    hide_index=True,
+                    height=700,
+                    width="stretch",
+                    column_config={
+                        "Obra": st.column_config.TextColumn("Obra", pinned=True, width="medium"),
+                        "Total recebido": st.column_config.TextColumn(
+                            "Total recebido", width="small",
+                            help="Soma de todos os pagamentos recebidos pela obra no período do snapshot.",
+                        ),
+                        "Cupons": st.column_config.TextColumn(
+                            "Cupons", width="small",
+                            help="Cupons gerados pelos clientes da obra. Calculado pelo Fabric: R$ recebido ÷ R$ 100 por cupom.",
+                        ),
+                        "Média diária": st.column_config.TextColumn(
+                            "Média diária",
+                            help="Recebimento médio por dia com pagamento: Total recebido ÷ dias em que houve ao menos um pagamento na obra.",
+                        ),
+                    },
+                )
     with c2:
         cupons_realizados = int(m["cupons_calculados"])
         cupons_limite = CUPONS_DISPONIVEIS or int(
