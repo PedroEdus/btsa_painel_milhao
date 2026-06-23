@@ -629,7 +629,8 @@ button[data-baseweb="tab"][aria-selected="true"] {{
 .cal-future {{ background: {P['neutral_bg']};          color: {P['muted']};                border: 1px solid {P['border2']}; }}
 .cal-final  {{ background: {SEMANTIC['danger_50']};    color: {SEMANTIC['danger_700']};    border: 1px solid #fecaca; }}
 /* ── Tabela HTML mobile com 1a coluna fixa (.mtbl-*) ─────── */
-.mtbl-wrap {{ overflow-x: auto; -webkit-overflow-scrolling: touch;
+.mtbl-wrap {{ display: block; width: 100%; max-width: 100%;
+  overflow-x: auto; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y;
   border: 1px solid {P['border']}; border-radius: 12px; }}
 .mtbl {{ border-collapse: separate; border-spacing: 0; font-size: 10.5px;
   width: max-content; min-width: 100%; }}
