@@ -238,33 +238,33 @@ with tabs[1]:
             _sty,
             hide_index=True,
             height=420,
-            width="content",
+            width="stretch",
             column_config={
                 "Cidade": st.column_config.TextColumn(
                     "Cidade", pinned=True, width="medium"),
                 "Clientes": st.column_config.NumberColumn(
-                    "Clientes", width="small",
+                    "Clientes",
                     help="Total de clientes únicos (CPF) com venda ativa na cidade."),
                 "Repres.": st.column_config.NumberColumn(
-                    "Repres.", width="small",
+                    "Repres.",
                     help="Representatividade: participação da cidade no total de clientes do portfólio."),
                 "Elegíveis": st.column_config.NumberColumn(
-                    "Elegíveis", width="small",
+                    "Elegíveis",
                     help="Clientes APTO na cidade — sem inadimplência, participam dos sorteios."),
                 "Pendentes": st.column_config.NumberColumn(
-                    "Pendentes", width="small",
+                    "Pendentes",
                     help="Clientes NÃO APTO na cidade — com parcelas vencidas."),
                 "% Inadimpl.": st.column_config.NumberColumn(
-                    "% Inadimpl.", width="small",
+                    "% Inadimpl.",
                     help="Inadimplência da cidade: pendentes ÷ total de clientes da cidade."),
                 "Cupons": st.column_config.NumberColumn(
-                    "Cupons", width="small",
+                    "Cupons",
                     help="Cupons gerados pelos clientes da cidade (1 cupom por R$ 100 recebido)."),
                 "% Cupons": st.column_config.NumberColumn(
-                    "% Cupons", width="small",
+                    "% Cupons",
                     help="Efeito da cidade: participação no total de cupons gerados na campanha."),
                 "Valor (R$)": st.column_config.NumberColumn(
-                    "Valor (R$)", width="medium",
+                    "Valor (R$)",
                     help="Soma do valor total recebido pelos clientes da cidade."),
             },
         )
@@ -398,19 +398,19 @@ with tabs[4]:
                 _top_fmt,
                 hide_index=True,
                 height=700,
-                width="content",
+                width="stretch",
                 column_config={
                     "Obra": st.column_config.TextColumn("Obra", pinned=True, width="medium"),
                     "Total recebido": st.column_config.TextColumn(
-                        "Total recebido", width="medium",
+                        "Total recebido",
                         help="Soma de todos os pagamentos recebidos pela obra no período do snapshot.",
                     ),
                     "Cupons": st.column_config.TextColumn(
-                        "Cupons", width="medium",
+                        "Cupons",
                         help="Cupons gerados pelos clientes da obra. Calculado pelo Fabric: R$ recebido ÷ R$ 100 por cupom.",
                     ),
                     "Média diária": st.column_config.TextColumn(
-                        "Média diária", width="medium",
+                        "Média diária",
                         help="Recebimento médio por dia com pagamento: Total recebido ÷ dias em que houve ao menos um pagamento na obra.",
                     ),
                 },

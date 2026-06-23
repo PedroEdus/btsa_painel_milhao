@@ -1055,20 +1055,20 @@ def tabela(df: pd.DataFrame, titulo: str = "", sub: str = "", status: bool = Tru
     else:
         obj = df
 
-    # Colunas com largura fixa "medium" p/ preencher melhor o espaço; a 1ª
-    # visível é congelada (ignora colunas técnicas de status, ex. badge).
-    # Texto longo é truncado (Streamlit não quebra linha em célula).
+    # Só a 1ª coluna visível tem largura fixa (medium) e fica congelada (pinned);
+    # as demais ficam sem width p/ expandir e preencher o container no desktop
+    # (width="stretch"). No mobile o container é estreito → colunas encolhem e
+    # rola na horizontal, com a 1ª fixa. (ignora colunas técnicas de status.)
     col_cfg = None
     if pin_primeira:
         _visiveis = [c for c in df.columns if c not in _COLS_STATUS]
         if _visiveis:
-            col_cfg = {c: st.column_config.Column(width="medium") for c in _visiveis}
-            col_cfg[_visiveis[0]] = st.column_config.Column(pinned=True, width="medium")
+            col_cfg = {_visiveis[0]: st.column_config.Column(pinned=True, width="medium")}
 
     if titulo:
         with card(titulo, sub):
-            st.dataframe(obj, hide_index=True, width="content", height=altura,
+            st.dataframe(obj, hide_index=True, width="stretch", height=altura,
                          column_config=col_cfg)
     else:
-        st.dataframe(obj, hide_index=True, width="content", height=altura,
+        st.dataframe(obj, hide_index=True, width="stretch", height=altura,
                      column_config=col_cfg)
