@@ -629,8 +629,8 @@ button[data-baseweb="tab"][aria-selected="true"] {{
 .cal-future {{ background: {P['neutral_bg']};          color: {P['muted']};                border: 1px solid {P['border2']}; }}
 .cal-final  {{ background: {SEMANTIC['danger_50']};    color: {SEMANTIC['danger_700']};    border: 1px solid #fecaca; }}
 /* ── Tabela HTML mobile com 1a coluna fixa (.mtbl-*) ─────── */
-.mtbl-wrap {{ display: block; width: 100%; max-width: 100%;
-  overflow-x: auto; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y;
+.mtbl-wrap {{ display: block; width: 100%; max-width: 100%; max-height: 72vh;
+  overflow: auto; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y;
   border: 1px solid {P['border']}; border-radius: 12px; }}
 /* min-width calc(100% + 140px): tabela sempre 140px mais larga que a tela →
    sempre estoura → sempre dá p/ arrastar, mesmo com poucas colunas. */
@@ -649,11 +649,12 @@ button[data-baseweb="tab"][aria-selected="true"] {{
 .mtbl td {{ padding: 6px 6px; border-bottom: 1px solid {P['border']};
   color: {P['text']}; white-space: nowrap; }}
 .mtbl tbody tr:last-child td {{ border-bottom: none; }}
-/* 1a coluna congelada — position:sticky funciona em scroll touch no mobile */
+/* 1a coluna congelada (horizontal) e cabeçalho congelado (vertical) — sticky */
 .mtbl th:first-child, .mtbl td:first-child {{
   position: sticky; left: 0; z-index: 2; background: {P['surface']};
   box-shadow: 1px 0 0 {P['border']}; }}
-.mtbl thead th:first-child {{ z-index: 3; background: {P['bg']}; }}
+.mtbl thead th {{ position: sticky; top: 0; z-index: 3; }}
+.mtbl thead th:first-child {{ z-index: 4; background: {P['bg']}; }}
 .mtbl-badge {{ padding: 2px 8px; border-radius: 6px; font-weight: 600; }}
 /* Coluna de obra: fonte menor p/ caber mais; toque (foco) mostra o nome
    completo (expande a célula). title= também dá tooltip em hover/long-press. */
