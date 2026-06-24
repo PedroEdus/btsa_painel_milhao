@@ -639,7 +639,6 @@ button[data-baseweb="tab"][aria-selected="true"] {{
 /* min-width nas colunas força a soma a passar da tela → overflow → arrasta.
    Valores enxutos p/ caber mais colunas na tela ao mesmo tempo. */
 .mtbl th, .mtbl td {{ min-width: 46px; }}
-.mtbl th:first-child, .mtbl td:first-child {{ min-width: 76px; }}
 .mtbl th {{ text-align: left; padding: 5px 6px; background: {P['bg']};
   color: {P['muted']}; font-size: 9px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .2px; white-space: nowrap;
