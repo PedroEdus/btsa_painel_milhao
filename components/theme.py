@@ -655,6 +655,12 @@ button[data-baseweb="tab"][aria-selected="true"] {{
   box-shadow: 1px 0 0 {P['border']}; }}
 .mtbl thead th:first-child {{ z-index: 3; background: {P['bg']}; }}
 .mtbl-badge {{ padding: 2px 8px; border-radius: 6px; font-weight: 600; }}
+/* Coluna de obra: fonte menor p/ caber mais; toque (foco) mostra o nome
+   completo (expande a célula). title= também dá tooltip em hover/long-press. */
+.mtbl td.obra-cell {{ font-size: 8.5px; line-height: 1.25; cursor: pointer; }}
+.mtbl td.obra-cell:focus {{ white-space: normal; max-width: 240px;
+  overflow: visible; outline: 2px solid {P['muted']}; background: {P['surface']};
+  position: relative; z-index: 5; }}
 @media (min-width: 1700px) {{
   .block-container {{ max-width:100% !important; padding:0.1rem 3rem 2.4rem !important; }}
   .ph-title {{ font-size:30px; }}

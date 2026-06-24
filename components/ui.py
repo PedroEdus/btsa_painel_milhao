@@ -1075,6 +1075,9 @@ def _tabela_html_body(df: pd.DataFrame, status_cols: tuple = ()) -> str:
     cols = list(df.columns)
     _align = {c: ("right" if (i != 0 and c not in status_cols and _col_numerica(df[c]))
                   else "left") for i, c in enumerate(cols)}
+    # Colunas de obra: fonte menor + toque expande p/ ver o nome completo
+    # (truncado com … por padrão). Só no mobile (esta tabela é mobile-only).
+    _obra = {c for c in cols if "obra" in str(c).lower()}
     ths = "".join(
         f'<th style="text-align:{_align[c]}">{_html.escape(str(c))}</th>' for c in cols)
     linhas = []
@@ -1087,6 +1090,11 @@ def _tabela_html_body(df: pd.DataFrame, status_cols: tuple = ()) -> str:
                 sty = _estilo_celula(v)
                 cell = f'<span class="mtbl-badge" style="{sty}">{txt}</span>' if sty else txt
                 tds.append(f'<td>{cell}</td>')
+            elif c in _obra:
+                # tabindex p/ receber foco no toque → CSS :focus expande;
+                # title = nome completo (tooltip em hover/long-press).
+                tds.append(f'<td class="obra-cell" tabindex="0" title="{txt}" '
+                           f'style="text-align:left">{txt}</td>')
             else:
                 tds.append(f'<td style="text-align:{_align[c]}">{txt}</td>')
         linhas.append(f"<tr>{''.join(tds)}</tr>")
