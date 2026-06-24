@@ -638,7 +638,10 @@ button[data-baseweb="tab"][aria-selected="true"] {{
   width: max-content; min-width: calc(100% + 140px); }}
 /* min-width nas colunas força a soma a passar da tela → overflow → arrasta.
    Valores enxutos p/ caber mais colunas na tela ao mesmo tempo. */
-.mtbl th, .mtbl td {{ min-width: 46px; }}
+/* max-width + ellipsis: nomes longos (ex: obra) cortam com "…" em vez de
+   esticar a coluna e empurrar as outras p/ fora da tela. */
+.mtbl th, .mtbl td {{ min-width: 46px; max-width: 130px;
+  overflow: hidden; text-overflow: ellipsis; }}
 .mtbl th {{ text-align: left; padding: 5px 6px; background: {P['bg']};
   color: {P['muted']}; font-size: 9px; font-weight: 700;
   text-transform: uppercase; letter-spacing: .2px; white-space: nowrap;
