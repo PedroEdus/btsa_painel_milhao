@@ -61,6 +61,28 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# Oculta o chrome do Streamlit o mais cedo possível (antes de login/dados) para
+# reduzir o flash (FOUC) do badge/manage button que o Streamlit Cloud pinta no
+# boot. O CSS completo de tema reaplica isso depois via page_header().
+st.markdown(
+    """
+    <style>
+    #MainMenu, footer, header[data-testid="stHeader"],
+    [data-testid="stToolbar"], [data-testid="stToolbarActions"],
+    [data-testid="stDecoration"], [data-testid="stStatusWidget"],
+    [data-testid="stAppDeployButton"], [data-testid="stMainMenuButton"],
+    [data-testid="manage-app-button"],
+    .viewerBadge_container__1QSob, .viewerBadge_link__1S137,
+    .viewerBadge_text__1JaDK,
+    [class*="viewerBadge_container"], [class*="viewerBadge_link"],
+    [class*="_profileContainer"], [class*="_container_"][class*="profile"] {
+        display: none !important; visibility: hidden !important; height: 0 !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # Gate de acesso: só passa quem logar com conta @btsa.com.br.
 exigir_login_btsa()
 
