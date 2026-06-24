@@ -121,8 +121,11 @@ input, textarea, h1, h2, h3, .stMarkdown p {{
 #MainMenu, footer, header[data-testid="stHeader"],
 [data-testid="stMainMenuButton"], [data-testid="stAppDeployButton"],
 [data-testid="stToolbar"], [data-testid="stToolbarActions"],
-[data-testid="stDecoration"], [data-testid="stStatusWidget"] {{
-  display:none !important; visibility:hidden !important; }}
+[data-testid="stDecoration"], [data-testid="stStatusWidget"],
+.viewerBadge_container__1QSob, .viewerBadge_link__1S137,
+.viewerBadge_text__1JaDK, [class*="viewerBadge_container"],
+[class*="viewerBadge_link"] {{
+  display:none !important; visibility:hidden !important; height:0 !important; }}
 /* Sidebar completamente removida — sem widget oculto, display:none é seguro. */
 [data-testid="stSidebar"],
 [data-testid="stExpandSidebarButton"],
