@@ -256,7 +256,7 @@ with tabs[1]:
                 width="stretch",
                 column_config={
                     "Cidade": st.column_config.TextColumn(
-                        "Cidade", pinned=True, width="medium"),
+                        "Cidade", pinned=True, width="large"),
                     "Clientes": st.column_config.NumberColumn(
                         "Clientes", width="small",
                         help="Total de clientes únicos (CPF) com venda ativa na cidade."),
@@ -418,7 +418,7 @@ with tabs[4]:
                     height=700,
                     width="stretch",
                     column_config={
-                        "Obra": st.column_config.TextColumn("Obra", pinned=True, width="medium"),
+                        "Obra": st.column_config.TextColumn("Obra", pinned=True, width="large"),
                         "Total recebido": st.column_config.TextColumn(
                             "Total recebido", width="small",
                             help="Soma de todos os pagamentos recebidos pela obra no período do snapshot.",

@@ -1142,7 +1142,7 @@ def tabela(df: pd.DataFrame, titulo: str = "", sub: str = "", status: bool = Tru
     if pin_primeira:
         _visiveis = [c for c in df.columns if c not in _COLS_STATUS]
         if _visiveis:
-            col_cfg = {_visiveis[0]: st.column_config.Column(pinned=True, width="medium")}
+            col_cfg = {_visiveis[0]: st.column_config.Column(pinned=True, width="large")}
             for c in _visiveis[1:-1]:
                 col_cfg[c] = st.column_config.Column(width="small")
 
