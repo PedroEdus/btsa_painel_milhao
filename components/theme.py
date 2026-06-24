@@ -632,8 +632,10 @@ button[data-baseweb="tab"][aria-selected="true"] {{
 .mtbl-wrap {{ display: block; width: 100%; max-width: 100%;
   overflow-x: auto; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y;
   border: 1px solid {P['border']}; border-radius: 12px; }}
+/* min-width calc(100% + 140px): tabela sempre 140px mais larga que a tela →
+   sempre estoura → sempre dá p/ arrastar, mesmo com poucas colunas. */
 .mtbl {{ border-collapse: separate; border-spacing: 0; font-size: 10.5px;
-  width: max-content; min-width: 100%; }}
+  width: max-content; min-width: calc(100% + 140px); }}
 /* min-width nas colunas força a soma a passar da tela → overflow → arrasta.
    Valores enxutos p/ caber mais colunas na tela ao mesmo tempo. */
 .mtbl th, .mtbl td {{ min-width: 46px; }}
