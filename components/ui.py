@@ -652,8 +652,14 @@ def _fmt_k(v: float) -> str:
     return str(int(v))
 
 
-def _show(fig, altura: int = 320, legenda: bool = True) -> None:
-    """Base render: grid v8, fundo transparente, font/label padronizados, tooltip estilo v8."""
+def _show(fig, altura: int = 320, legenda: bool = True,
+          interativo: bool = False) -> None:
+    """Base render: grid v8, fundo transparente, font/label padronizados, tooltip estilo v8.
+
+    interativo=True libera só o hover (tooltip) mantendo a barra de ferramentas
+    oculta e o scroll/zoom travados — usado em séries onde o valor por ponto
+    (ex.: recebimento diário) não cabe como rótulo fixo.
+    """
     fig.update_layout(
         height=altura,
         paper_bgcolor="rgba(0,0,0,0)",
@@ -684,8 +690,15 @@ def _show(fig, altura: int = 320, legenda: bool = True) -> None:
     _show_counter[0] += 1
     # staticPlot: gráfico sem interação (toque/scroll não agarram). Rótulos já
     # mostram os valores, então o hover não faz falta. Tabelas seguem interativas.
+    # interativo=True: libera hover, mas trava zoom/scroll/drag p/ não agarrar.
+    if interativo:
+        _cfg = {"displayModeBar": False, "staticPlot": False,
+                "scrollZoom": False, "doubleClick": False, "showAxisDragHandles": False}
+        fig.update_layout(dragmode=False)
+    else:
+        _cfg = {"displayModeBar": False, "staticPlot": True}
     st.plotly_chart(fig, key=f"chart_{_show_counter[0]}", width="stretch",
-                    config={"displayModeBar": False, "staticPlot": True})
+                    config=_cfg)
 
 
 def linha_temporal(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str = "",
@@ -694,7 +707,16 @@ def linha_temporal(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str 
     ctx = card(titulo, sub) if not skip_card else _null_ctx()
     with ctx:
         fig = px.area(df, x=x, y=y, line_shape="spline")
-        ht = "<b>%{x}</b><br>Acumulado: <b>R$ %{y:,.2f}</b><extra></extra>"
+        # Valor por ponto (diário): mostra "No dia" + "Acumulado" no hover quando
+        # a coluna existe; senão cai p/ só acumulado.
+        _diaria = "valor_total_recebido"
+        if _diaria in df.columns:
+            customdata = df[[_diaria]].to_numpy()
+            ht = ("<b>%{x}</b><br>No dia: <b>R$ %{customdata[0]:,.2f}</b>"
+                  "<br>Acumulado: <b>R$ %{y:,.2f}</b><extra></extra>")
+        else:
+            customdata = None
+            ht = "<b>%{x}</b><br>Acumulado: <b>R$ %{y:,.2f}</b><extra></extra>"
         fig.update_traces(
             line=dict(color=BRAND["500"], width=2.5),
             fillcolor="rgba(46,125,50,.12)",
@@ -705,6 +727,7 @@ def linha_temporal(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str 
             ),
             mode="lines+markers",
             name=titulo,
+            customdata=customdata,
             hovertemplate=ht,
         )
         # anotação no último ponto (label com fundo verde = v8 xaxis annotation)
@@ -732,8 +755,9 @@ def linha_temporal(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str 
             yaxis=dict(tickformat=".2s"),
             # dd/mm — neutro, evita meses em inglês do plotly (May, Jun…)
             xaxis=dict(tickangle=0, tickformat="%d/%m"),
+            hovermode="x unified",
         )
-        _show(fig)
+        _show(fig, interativo=True)
 
 
 def barras(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str = "",
