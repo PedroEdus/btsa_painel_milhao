@@ -565,14 +565,14 @@ with tabs[5]:
   .hx .nm{position:sticky;left:0;z-index:2;background:#fff;box-shadow:1px 0 0 #e6e8eb}
   .hx-head{z-index:3}
   .hx-head .nm{z-index:4;background:#f5f6f8}
-  /* Toque no nome do produto (folha) expande a celula p/ ver o texto
-     completo (igual .mtbl td.obra-cell em ui.py) — a coluna continua fixa
-     (sticky-left), entao da pra arrastar o resto da linha p/ ver os numeros
-     com o nome ja expandido. */
+  /* Toque no nome do produto (folha) quebra o texto DENTRO da largura da
+     coluna (sem invadir as colunas vizinhas) — a linha toda cresce em
+     altura (grid sem altura fixa) e os numeros continuam visiveis ao lado,
+     sem precisar arrastar. */
   .hx .leaf .nm.i3{cursor:pointer}
-  .hx .leaf .nm.i3:focus{white-space:normal;width:max-content;max-width:260px;
-    justify-self:start;overflow:visible;outline:2px solid #9499a3;
-    z-index:5;background:#fff;padding-right:14px}
+  .hx .leaf .nm.i3:focus{white-space:normal;overflow-wrap:break-word;
+    overflow:visible;align-self:stretch;display:flex;align-items:center;
+    outline:2px solid #9499a3;z-index:5;background:#fff}
 """ if _mob else ""
     st.markdown(f"""
 <style>
