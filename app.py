@@ -20,6 +20,7 @@ from components import (
     linha_temporal,
     medidor,
     mes_ano_pt,
+    mes_extenso_pt,
     moeda,
     moeda_compacta,
     nota_regra,
@@ -43,6 +44,7 @@ from services import (
     exigir_login_btsa,
     funil_participacao,
     inadimplencia_por_cidade,
+    inadimplencia_por_faixa,
     kpis_carteira,
     mes_referencia_atual,
     preparar,
@@ -135,6 +137,7 @@ tabs = st.tabs([
     "Funil da Campanha",
     "Matriz de Participação",
     "Indicadores Executivos",
+    "Exportação",
 ])
 
 # ── Tab 0 — Visão Geral ───────────────────────────────────────────────────────
@@ -165,6 +168,7 @@ with tabs[0]:
     _parcela_media = (
         _pag["valor_total_recebido"].sum() / _n_pagantes if _n_pagantes else 0.0
     )
+    _dias_atraso_medio = df.loc[df["dias_atraso"] > 0, "dias_atraso"].mean() or 0
     stat_cards([
         {"label": "Cupons/dia (média)", "valor": numero(round(media_cupons_dia)),
          "icon": "fa-chart-line", "cor": "blue",
@@ -175,6 +179,9 @@ with tabs[0]:
         {"label": "Saldo inadimplente hoje", "valor": moeda(m["valor_vencido"]),
          "icon": "fa-triangle-exclamation", "cor": "red",
          "tooltip": "Valor total vencido em aberto na carteira (valor_inadimplencia): saldo que clientes NÃO APTO devem na data do snapshot."},
+        {"label": "Dias médios em atraso", "valor": numero(round(_dias_atraso_medio)),
+         "icon": "fa-clock", "cor": "amber",
+         "tooltip": "Média de dias de atraso entre clientes inadimplentes (dias_atraso > 0) na data do snapshot."},
         {"label": "Parcela média paga", "valor": moeda(_parcela_media),
          "icon": "fa-receipt", "cor": "green",
          "tooltip": "Valor médio pago por pagante: total recebido ÷ número de pagantes (CPFs com recebimento > 0)."},
@@ -209,20 +216,24 @@ with tabs[1]:
     ])
     c1, c2 = st.columns(2)
     with c1:
+        por_reg_cup = (
+            df.groupby("regional", as_index=False)["cupons_calculados"]
+            .sum().sort_values("cupons_calculados", ascending=False)
+        )
         barras_cidades(
-            cupons_por_cidade(df, n=8), "cidade", "cupons_calculados",
-            "Engajamento por cidade — cupons gerados",
+            por_reg_cup, "regional", "cupons_calculados",
+            "Engajamento por regional — cupons gerados",
             "Performance: verde=alto · âmbar=médio · vermelho=baixo",
         )
     with c2:
-        por_cidade_rec = (
-            df.groupby("cidade", as_index=False)["valor_total_recebido"]
-            .sum().sort_values("valor_total_recebido", ascending=False).head(8)
+        por_reg_rec = (
+            df.groupby("regional", as_index=False)["valor_total_recebido"]
+            .sum().sort_values("valor_total_recebido", ascending=False)
         )
         barras_cidades(
-            por_cidade_rec, "cidade", "valor_total_recebido",
-            "Volume de recebimento por cidade",
-            "Volume financeiro total arrecadado por município",
+            por_reg_rec, "regional", "valor_total_recebido",
+            "Volume de recebimento por regional",
+            "Volume financeiro total arrecadado por regional",
             is_monetary=True,
         )
     # Participação por cidade — valores numéricos crus p/ ordenação correta.
@@ -314,13 +325,9 @@ with tabs[2]:
          "tooltip": "Total de clientes únicos (CPF) com venda ativa no portfólio, independente de elegibilidade."},
         {"label": "Elegíveis p/ sorteio", "valor": numero(m["clientes_elegiveis"]),
          "icon": "fa-circle-check", "cor": "green",
-         "trend": {"tipo": "up", "icon": "fa-arrow-up",
-                   "texto": f'{m["pct_adimplencia"]:.1f}%'},
          "tooltip": "Clientes com status APTO: sem inadimplência no mês de referência, participam automaticamente dos sorteios."},
         {"label": "Inadimplentes", "valor": numero(m["inadimplentes"]),
          "icon": "fa-ban", "cor": "red",
-         "trend": {"tipo": "neutral", "icon": "fa-minus",
-                   "texto": f'{100 - m["pct_adimplencia"]:.1f}%'},
          "tooltip": "Clientes com status NÃO APTO: possuem parcelas vencidas e não participam dos sorteios mensais."},
         {"label": "Cupons calculados", "valor": numero(m["cupons_calculados"]),
          "icon": "fa-ticket", "cor": "blue",
@@ -358,10 +365,12 @@ with tabs[2]:
               "Do recebimento à elegibilidade")
     c3, c4 = st.columns(2)
     with c3:
-        barras(cupons_por_mes(df), "mes_referencia", "cupons_calculados",
+        _cupons_mes = cupons_por_mes(df).copy()
+        _cupons_mes["mes_referencia"] = _cupons_mes["mes_referencia"].map(mes_extenso_pt)
+        barras(_cupons_mes, "mes_referencia", "cupons_calculados",
                "Cupons por mês (concorrem ao sorteio do mês)",
                "Mês atual destacado · acumulado concorre ao prêmio final de R$ 1 milhão",
-               destaque=mes_referencia_atual())
+               destaque=mes_extenso_pt(mes_referencia_atual()))
     with c4:
         donut(recebimento_por_classificacao(df), "classificacao_recebimento",
               "valor_total_recebido", "Origem do recebimento", "Normal vs recuperação",
@@ -475,6 +484,124 @@ with tabs[4]:
         donut(recebimento_por_classificacao(df), "classificacao_recebimento",
               "valor_total_recebido", "Composição do recebimento", "Normal vs recuperação",
               cores={"normal": "#2a9d45", "recuperacao": "#f59e0b"})
+
+# ── Tab 5 — Exportação ───────────────────────────────────────────────────────
+with tabs[5]:
+    _df_exp = df.copy()
+    if "empresa_codigo" not in _df_exp.columns:
+        _df_exp["empresa_codigo"] = _df_exp["codempresa"].astype(str)
+    _mat = (
+        _df_exp.groupby(["regional", "cidade", "empresa_codigo", "obra_nome"], as_index=False)
+        .agg(
+            clientes=("cpf_titular", "nunique"),
+            elegiveis=("status_elegibilidade", lambda s: (s == "elegivel").sum()),
+            inadimplentes=("status_elegibilidade", lambda s: (s == "pendente").sum()),
+            cupons=("cupons_calculados", "sum"),
+            recebido=("valor_total_recebido", "sum"),
+        )
+        .sort_values(["regional", "cidade", "empresa_codigo", "obra_nome"])
+        .reset_index(drop=True)
+    )
+
+    _csv_mat = _mat.rename(columns={
+        "regional": "Regional", "cidade": "Cidade", "empresa_codigo": "Empresa",
+        "obra_nome": "Produto", "clientes": "Clientes", "elegiveis": "Elegíveis",
+        "inadimplentes": "Inadimplentes", "cupons": "Cupons", "recebido": "Recebido (R$)",
+    })
+    def _brl(v): return "R$ {:,.2f}".format(v).replace(",", "X").replace(".", ",").replace("X", ".")
+    def _num(v): return "{:,}".format(int(v)).replace(",", ".")
+
+    # Drill-down nativo via <details>/<summary> — sem JS, sem iframe. st.markdown
+    # renderiza inline (largura total) e o DOMPurify do Streamlit preserva
+    # <details>/<summary>/style (só remove <script>/onclick). Cada linha é um
+    # grid de 6 colunas, então as métricas alinham entre todos os níveis. A seta
+    # é &#9654; (HTML entity p/ não quebrar no cp1252) e gira via CSS no [open].
+    def _cells(s):
+        return (
+            f'<span class="c">{_num(s.clientes)}</span>'
+            f'<span class="c">{_num(s.elegiveis)}</span>'
+            f'<span class="c">{_num(s.inadimplentes)}</span>'
+            f'<span class="c">{_num(s.cupons)}</span>'
+            f'<span class="c">{_brl(s.recebido)}</span>'
+        )
+
+    _rows = ""
+    for _reg, _g1 in _mat.groupby("regional"):
+        _r = _g1[["clientes","elegiveis","inadimplentes","cupons","recebido"]].sum()
+        _rows += (f'<details class="lv0"><summary>'
+                  f'<span class="nm"><span class="arr">&#9654;</span> <b>{_reg}</b></span>{_cells(_r)}</summary>')
+        for _cid, _g2 in _g1.groupby("cidade"):
+            _c = _g2[["clientes","elegiveis","inadimplentes","cupons","recebido"]].sum()
+            _rows += (f'<details class="lv1"><summary>'
+                      f'<span class="nm i1"><span class="arr">&#9654;</span> {_cid}</span>{_cells(_c)}</summary>')
+            for _emp, _g3 in _g2.groupby("empresa_codigo"):
+                _e = _g3[["clientes","elegiveis","inadimplentes","cupons","recebido"]].sum()
+                _rows += (f'<details class="lv2"><summary>'
+                          f'<span class="nm i2"><span class="arr">&#9654;</span> Empresa {_emp}</span>{_cells(_e)}</summary>')
+                for _, _row in _g3.iterrows():
+                    _rows += (f'<div class="lv3 leaf">'
+                              f'<span class="nm i3">{_row["obra_nome"]}</span>{_cells(_row)}</div>')
+                _rows += '</details>'
+            _rows += '</details>'
+        _rows += '</details>'
+
+    # IMPORTANTE: o <style> vai em um st.markdown SEPARADO do conteúdo. O
+    # Streamlit colapsa p/ width:0 qualquer stElementContainer que :has(.stMarkdown
+    # style) — tratando markdown-com-style como injetor de CSS puro. Misturar
+    # style+tabela no mesmo markdown zeraria a largura da tabela.
+    st.markdown("""
+<style>
+  .hx{border:1px solid #e6e8eb;border-radius:6px;font-size:13px;background:#fff;color:#232329}
+  .hx-scroll{max-height:600px;overflow:auto;border-radius:6px;background:#fff}
+  .hx-head,.hx summary,.hx .leaf{
+    display:grid;grid-template-columns:minmax(260px,1.8fr) repeat(5,1fr);
+    align-items:center;column-gap:0;border-bottom:1px solid #e6e8eb}
+  /* celulas: separador vertical entre colunas (igual st.dataframe) */
+  .hx-head>span,.hx summary>span,.hx .leaf>span{
+    padding:11px 14px;border-right:1px solid #e6e8eb;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hx-head>span:last-child,.hx summary>span:last-child,.hx .leaf>span:last-child{border-right:none}
+  .hx-head{background:#f5f6f8;color:#6b6b74;font-weight:600;position:sticky;top:0;z-index:1}
+  .hx-head .c,.hx summary .c,.hx .leaf .c{text-align:left;font-variant-numeric:tabular-nums}
+  .hx .nm{color:#232329}
+  .hx-head .nm{color:#6b6b74}
+  /* card branco (so o container do card: tem a linha de colunas titulo+botao E
+     a tabela .hx). NAO usar :has(.hx) puro — casaria todo ancestral, inclusive o
+     bloco principal do app, pintando barra branca em todas as abas. */
+  [data-testid="stVerticalBlock"]:has(> [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"]):has(.hx){background:#fff;padding:8px 12px 40px}
+  [data-testid="stElementContainer"]:has([data-testid="stDownloadButton"]){width:100%}
+  [data-testid="stDownloadButton"]{display:flex;justify-content:flex-end;width:100%}
+  .hx summary{cursor:pointer;list-style:none;background:#fff}
+  .hx summary::-webkit-details-marker{display:none}
+  .hx details.lv0>summary{font-weight:600}
+  .hx details.lv1>summary{font-weight:500}
+  .hx .leaf{background:#fff}
+  .hx summary:hover,.hx .leaf:hover{background:#f6f9fd}
+  .hx .arr{display:inline-block;transition:transform .15s;font-size:10px;color:#9499a3}
+  .hx details[open]>summary .arr{transform:rotate(90deg)}
+  .hx .nm.i1{padding-left:32px} .hx .nm.i2{padding-left:50px} .hx .nm.i3{padding-left:68px}
+</style>
+""", unsafe_allow_html=True)
+    with card():
+        _hc1, _hc2 = st.columns([5, 1], vertical_alignment="center")
+        _hc1.markdown(
+            '<div class="card-title">Matriz de Exportação</div>'
+            '<div class="card-sub">Detalhamento por regional, cidade, empresa e produto</div>',
+            unsafe_allow_html=True,
+        )
+        _hc2.download_button("Baixar CSV",
+                             _csv_mat.to_csv(index=False, sep=";", decimal=",").encode("utf-8"),
+                             "matriz_exportacao.csv", "text/csv")
+        st.markdown(f"""
+<div class="hx"><div class="hx-scroll">
+  <div class="hx-head">
+    <span class="nm">Regional / Cidade / Empresa / Produto</span>
+    <span class="c">Clientes</span><span class="c">Elegíveis</span>
+    <span class="c">Inadimpl.</span><span class="c">Cupons</span><span class="c">Recebido (R$)</span>
+  </div>
+  {_rows}
+</div></div>
+""", unsafe_allow_html=True)
 
 # ── Rodapé global (todas as abas) ─────────────────────────────────────────────
 st.markdown(

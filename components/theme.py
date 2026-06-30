@@ -175,7 +175,7 @@ h1, h2, h3 {{ font-weight:800 !important; color:{P['text']}; letter-spacing:-.3p
     repeating-linear-gradient(63deg, rgba(255,255,255,.045) 0 1px, transparent 1px 34px); }}
 .hero::after {{ content:''; position:absolute; left:0; top:0; bottom:0; width:5px;
   background: linear-gradient(180deg,#fff7cc,#ffd700,#b8860b); }}
-.hero-inner {{ position:relative; padding:24px 30px; }}
+.hero-inner {{ position:relative; padding:19px 30px 20px; }}
 .hero-label {{ font-size:12.5px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase;
   color: rgba(255,255,255,.72); }}
 .hero-value {{ font-size:clamp(26px,3vw,40px); font-weight:800; letter-spacing:-.4px; line-height:1.05;
@@ -189,7 +189,7 @@ h1, h2, h3 {{ font-weight:800 !important; color:{P['text']}; letter-spacing:-.3p
 /* ── Stat cards ────────────────────────────────────────────── */
 .stats-row {{ display:grid; grid-template-columns:repeat(auto-fit, minmax(225px,1fr)); gap:16px; margin-bottom:8px; }}
 .stat-card {{ background:{P['surface']}; border:1px solid {P['border']}; border-radius:{RADIUS['lg']};
-  padding:20px 22px; box-shadow:{P['shadow']}; position:relative; overflow:visible;
+  padding:8px 22px; box-shadow:{P['shadow']}; position:relative; overflow:visible;
   transition: box-shadow 150ms cubic-bezier(.4,0,.2,1), transform 150ms cubic-bezier(.4,0,.2,1),
               background-color .45s ease, border-color .45s ease; }}
 .stat-card::before {{ content:''; position:absolute; top:0; left:0; right:0; height:3px;
@@ -499,7 +499,7 @@ button[data-baseweb="tab"][aria-selected="true"] {{
 .prog-adim-wrap {{
   background: {P['surface']}; border: 1px solid {P['border']};
   border-radius: {RADIUS['md']};
-  padding: 20px 24px; margin-bottom: 18px; box-shadow: {P['shadow']};
+  padding: 18px 24px 17px; margin-bottom: 18px; box-shadow: {P['shadow']};
 }}
 .prog-adim-row {{
   display: flex; align-items: flex-start; justify-content: space-between;
@@ -555,7 +555,7 @@ button[data-baseweb="tab"][aria-selected="true"] {{
 .banner-prem {{
   background: {P['surface']}; border: 1px solid {P['border']};
   border-left: 4px solid {BRAND['500']}; border-radius: {RADIUS['md']};
-  padding: 16px 20px; margin-bottom: 18px; box-shadow: {P['shadow']};
+  padding: 13px 20px 14px; margin-bottom: 18px; box-shadow: {P['shadow']};
   display: flex; align-items: flex-start; justify-content: space-between;
   gap: 16px; flex-wrap: wrap;
   animation: fadeUp .45s cubic-bezier(.4,0,.2,1) both .08s;
@@ -581,7 +581,7 @@ button[data-baseweb="tab"][aria-selected="true"] {{
 .cmp-wrap {{
   background:{P['surface']}; border:1px solid {P['border']};
   border-radius:{RADIUS['lg']}; box-shadow:{P['shadow']};
-  padding:18px 22px; margin-bottom:8px;
+  padding:13px 22px; margin-bottom:8px;
 }}
 .cmp-hd {{ font-size:14px; font-weight:700; color:{P['text']}; margin-bottom:2px; }}
 .cmp-sub {{ font-size:12px; color:{P['muted']}; margin-bottom:14px; }}
@@ -607,9 +607,9 @@ button[data-baseweb="tab"][aria-selected="true"] {{
   padding:2px 8px; border-radius:99px; letter-spacing:.3px; }}
 
 /* Nota de regra discreta (CONTEXT item 5) */
-.nota-regra {{ font-size:11.5px; color:{P['muted']}; margin:2px 0 10px;
+.nota-regra {{ font-size:10px; color:{P['muted']}; margin:2px 0 10px;
   padding-left:23px; display:inline-flex; align-items:center; gap:6px; }}
-.nota-regra i {{ color:{BRAND['500']}; font-size:12px; }}
+.nota-regra i {{ color:{BRAND['500']}; font-size:10.5px; }}
 
 /* ── Calendário de sorteios (.cal-*) ────────────────────── */
 .cal-table {{ width: 100%; border-collapse: collapse; font-size: 12.5px; }}

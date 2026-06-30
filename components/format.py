@@ -32,6 +32,19 @@ def mes_ano_pt(ts, ano_curto: bool = False) -> str:
     return f"{mes}/{ano:02d}" if ano_curto else f"{mes}/{ano}"
 
 
+# Nomes de mês por extenso pt-BR (locale do servidor pode não ter pt_BR).
+_MESES_PT_EXTENSO = {
+    1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril", 5: "Maio", 6: "Junho",
+    7: "Julho", 8: "Agosto", 9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro",
+}
+
+
+def mes_extenso_pt(competencia: str) -> str:
+    """'YYYY-MM' → 'Maio de 2026' (mês por extenso, pt-BR)."""
+    ano, mes = competencia.split("-")
+    return f"{_MESES_PT_EXTENSO[int(mes)]} de {ano}"
+
+
 def moeda_compacta(valor: float) -> str:
     """Moeda abreviada p/ cards estreitos: R$ 3,14 bi · R$ 86,8 mi · R$ 12 mil."""
     v = float(valor or 0)

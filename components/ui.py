@@ -541,7 +541,7 @@ def donut(df: pd.DataFrame, names: str, values: str, titulo: str, sub: str = "",
         # Donut à esquerda (coluna larga p/ centralizar), legenda à direita.
         cols = st.columns([1.7, 1])
         with cols[0]:
-            _show(fig, 320, legenda=False)
+            _show(fig, 260, legenda=False)
         with cols[1]:
             st.markdown(
                 '<div style="display:flex;flex-direction:column;justify-content:center;'
@@ -599,7 +599,7 @@ def funil(df: pd.DataFrame, x: str, y: str, titulo: str, sub: str = "") -> None:
             yaxis=dict(title=""),
             hoverlabel=_v8_hoverlabel(),
         )
-        _show(fig, 320)
+        _show(fig, 260)
 
 
 def selo_calculado_vs_oficial() -> None:
@@ -652,7 +652,7 @@ def _fmt_k(v: float) -> str:
     return str(int(v))
 
 
-def _show(fig, altura: int = 320, legenda: bool = True,
+def _show(fig, altura: int = 260, legenda: bool = True,
           interativo: bool = False) -> None:
     """Base render: grid v8, fundo transparente, font/label padronizados, tooltip estilo v8.
 

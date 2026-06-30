@@ -3,6 +3,7 @@ from components.format import (
     mascarar_email,
     mascarar_telefone,
     mes_ano_pt,
+    mes_extenso_pt,
     moeda,
     moeda_compacta,
     numero,
@@ -51,7 +52,7 @@ from components.ui import (
 )
 
 __all__ = [
-    "mes_ano_pt", "moeda", "moeda_compacta", "numero", "percentual", "percentual_seguro", "pct_valor",
+    "mes_ano_pt", "mes_extenso_pt", "moeda", "moeda_compacta", "numero", "percentual", "percentual_seguro", "pct_valor",
     "mascarar_cpf", "mascarar_telefone", "mascarar_email",
     "page_header", "stat_cards", "card", "badge", "logo", "splash", "auto_refresh", "tema_toggle",
     "hero", "donut", "medidor", "funil", "comparativo_carteira", "nota_regra",

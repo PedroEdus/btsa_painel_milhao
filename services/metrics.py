@@ -124,6 +124,19 @@ def recebimento_por_classificacao(df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def inadimplencia_por_faixa(df: pd.DataFrame) -> pd.DataFrame:
+    """Clientes inadimplentes segmentados por faixa de dias em atraso."""
+    _inad = df[df["dias_atraso"] > 0].copy()
+    bins   = [0, 30, 60, 90, 180, float("inf")]
+    labels = ["1-30 dias", "31-60 dias", "61-90 dias", "91-180 dias", "180+ dias"]
+    _inad["faixa"] = pd.cut(_inad["dias_atraso"], bins=bins, labels=labels, right=True)
+    return (
+        _inad.groupby("faixa", as_index=False, observed=True)["cpf_titular"]
+        .nunique()
+        .rename(columns={"cpf_titular": "clientes"})
+    )
+
+
 def funil_participacao(df: pd.DataFrame) -> pd.DataFrame:
     """Funil real da campanha (CONTEXT 7 — não inventar etapa de cadastro).
 

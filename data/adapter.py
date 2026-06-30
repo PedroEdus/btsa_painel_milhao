@@ -61,7 +61,13 @@ def adaptar(df: pd.DataFrame) -> pd.DataFrame:
     # ── Identificadores ──────────────────────────────────────────────────────
     df["obra"]      = df["obra_nome"]   # nome legível como coluna canônica
     df["num_venda"] = df["num_venda"].astype(str)
-    df["empresa"]   = "Brasil Terrenos"
+    df["empresa"]       = "Brasil Terrenos"
+    # Código da empresa como coluna separada (nome não disponível no bronze).
+    if "codempresa" in df.columns:
+        df["empresa_codigo"] = df["codempresa"].astype(str)
+    # Regional vem com espaço à esquerda no bronze (" NORTE"); normaliza.
+    if "regional" in df.columns:
+        df["regional"] = df["regional"].astype(str).str.strip()
 
     # ── Datas ────────────────────────────────────────────────────────────────
     df["data_recebimento"]      = pd.to_datetime(df["data_recebimento"], dayfirst=True, errors="coerce")
@@ -88,7 +94,13 @@ def adaptar(df: pd.DataFrame) -> pd.DataFrame:
     df["valor_recuperado"] = 0.0
 
     # ── Flags e defaults ─────────────────────────────────────────────────────
-    df["classificacao_recebimento"]   = "normal"
+    # Recuperação = quem estava inadimplente e pagou no mês (col bronze nova).
+    # Sem a coluna, cai p/ "normal" (comportamento antigo).
+    if "inadimplente_no_mes_pago" in df.columns:
+        _recup = df["inadimplente_no_mes_pago"].astype(str).str.strip().str.upper().str.startswith("S")
+        df["classificacao_recebimento"] = _recup.map({True: "recuperacao", False: "normal"})
+    else:
+        df["classificacao_recebimento"] = "normal"
     df["flag_vencido"]                = ~_apto
     df["participa_proximos_sorteios"] = _apto
     df["flag_antecipacao"]            = False
@@ -98,7 +110,11 @@ def adaptar(df: pd.DataFrame) -> pd.DataFrame:
     df["flag_contemplado_casa"]       = False
     df["participa_proximos_sorteios"] = _apto
     df["qtd_parcelas_pagas"]          = 0
-    df["dias_atraso"]                 = 0
+    # Dias de atraso real (bronze: diasatraso, nulo p/ adimplente → 0).
+    if "diasatraso" in df.columns:
+        df["dias_atraso"] = pd.to_numeric(df["diasatraso"], errors="coerce").fillna(0).astype(int)
+    else:
+        df["dias_atraso"] = 0
     df["qtd_parcelas_vencidas"]       = 0
     df["status_inadimplencia_antes"]  = "adimplente"
     df["status_apos_pagamento"]       = "adimplente"
