@@ -481,9 +481,9 @@ with tabs[4]:
                     "÷ R$ 100 por cupom. Mostra o quanto a campanha pode crescer "
                     "conforme a carteira é paga."
                 ))
-        donut(recebimento_por_classificacao(df), "classificacao_recebimento",
-              "valor_total_recebido", "Composição do recebimento", "Normal vs recuperação",
-              cores={"normal": "#2a9d45", "recuperacao": "#f59e0b"})
+        barras(inadimplencia_por_faixa(df), "faixa", "clientes",
+               "Inadimplência por faixa de atraso",
+               "Clientes não aptos segmentados por dias em atraso")
 
 # ── Tab 5 — Exportação ───────────────────────────────────────────────────────
 with tabs[5]:
@@ -549,37 +549,55 @@ with tabs[5]:
     # Streamlit colapsa p/ width:0 qualquer stElementContainer que :has(.stMarkdown
     # style) — tratando markdown-com-style como injetor de CSS puro. Misturar
     # style+tabela no mesmo markdown zeraria a largura da tabela.
-    st.markdown("""
-<style>
-  .hx{border:1px solid #e6e8eb;border-radius:6px;font-size:13px;background:#fff;color:#232329}
-  .hx-scroll{max-height:600px;overflow:auto;border-radius:6px;background:#fff}
+    #
+    # Mobile usa o mesmo padrão das outras tabelas (.mtbl em ui.py): 1a coluna
+    # fixa via position:sticky (o "pinned" do st.dataframe não trava em scroll
+    # touch), colunas com largura mínima fixa p/ sempre estourar a tela →
+    # sempre dá p/ arrastar, fonte/padding menores, área de scroll com altura
+    # máxima de viewport (72vh) igual ao .mtbl-wrap.
+    _hx_mobile_css = """
+  .hx-scroll{max-height:72vh;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}
   .hx-head,.hx summary,.hx .leaf{
+    grid-template-columns:148px repeat(4,68px) 104px;
+    width:max-content;min-width:calc(100% + 140px)}
+  .hx-head>span,.hx summary>span,.hx .leaf>span{padding:7px 8px;font-size:10.5px}
+  .hx{font-size:10.5px}
+  .hx .nm{position:sticky;left:0;z-index:2;background:#fff;box-shadow:1px 0 0 #e6e8eb}
+  .hx-head{z-index:3}
+  .hx-head .nm{z-index:4;background:#f5f6f8}
+""" if _mob else ""
+    st.markdown(f"""
+<style>
+  .hx{{border:1px solid #e6e8eb;border-radius:6px;font-size:13px;background:#fff;color:#232329}}
+  .hx-scroll{{max-height:600px;overflow:auto;border-radius:6px;background:#fff}}
+  .hx-head,.hx summary,.hx .leaf{{
     display:grid;grid-template-columns:minmax(260px,1.8fr) repeat(5,1fr);
-    align-items:center;column-gap:0;border-bottom:1px solid #e6e8eb}
+    align-items:center;column-gap:0;border-bottom:1px solid #e6e8eb}}
   /* celulas: separador vertical entre colunas (igual st.dataframe) */
-  .hx-head>span,.hx summary>span,.hx .leaf>span{
+  .hx-head>span,.hx summary>span,.hx .leaf>span{{
     padding:11px 14px;border-right:1px solid #e6e8eb;
-    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .hx-head>span:last-child,.hx summary>span:last-child,.hx .leaf>span:last-child{border-right:none}
-  .hx-head{background:#f5f6f8;color:#6b6b74;font-weight:600;position:sticky;top:0;z-index:1}
-  .hx-head .c,.hx summary .c,.hx .leaf .c{text-align:left;font-variant-numeric:tabular-nums}
-  .hx .nm{color:#232329}
-  .hx-head .nm{color:#6b6b74}
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+  .hx-head>span:last-child,.hx summary>span:last-child,.hx .leaf>span:last-child{{border-right:none}}
+  .hx-head{{background:#f5f6f8;color:#6b6b74;font-weight:600;position:sticky;top:0;z-index:1}}
+  .hx-head .c,.hx summary .c,.hx .leaf .c{{text-align:left;font-variant-numeric:tabular-nums}}
+  .hx .nm{{color:#232329}}
+  .hx-head .nm{{color:#6b6b74}}
   /* card branco (so o container do card: tem a linha de colunas titulo+botao E
      a tabela .hx). NAO usar :has(.hx) puro — casaria todo ancestral, inclusive o
      bloco principal do app, pintando barra branca em todas as abas. */
-  [data-testid="stVerticalBlock"]:has(> [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"]):has(.hx){background:#fff;padding:8px 12px 40px}
-  [data-testid="stElementContainer"]:has([data-testid="stDownloadButton"]){width:100%}
-  [data-testid="stDownloadButton"]{display:flex;justify-content:flex-end;width:100%}
-  .hx summary{cursor:pointer;list-style:none;background:#fff}
-  .hx summary::-webkit-details-marker{display:none}
-  .hx details.lv0>summary{font-weight:600}
-  .hx details.lv1>summary{font-weight:500}
-  .hx .leaf{background:#fff}
-  .hx summary:hover,.hx .leaf:hover{background:#f6f9fd}
-  .hx .arr{display:inline-block;transition:transform .15s;font-size:10px;color:#9499a3}
-  .hx details[open]>summary .arr{transform:rotate(90deg)}
-  .hx .nm.i1{padding-left:32px} .hx .nm.i2{padding-left:50px} .hx .nm.i3{padding-left:68px}
+  [data-testid="stVerticalBlock"]:has(> [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"]):has(.hx){{background:#fff;padding:8px 12px 40px}}
+  [data-testid="stElementContainer"]:has([data-testid="stDownloadButton"]){{width:100%}}
+  [data-testid="stDownloadButton"]{{display:flex;justify-content:flex-end;width:100%}}
+  .hx summary{{cursor:pointer;list-style:none;background:#fff}}
+  .hx summary::-webkit-details-marker{{display:none}}
+  .hx details.lv0>summary{{font-weight:600}}
+  .hx details.lv1>summary{{font-weight:500}}
+  .hx .leaf{{background:#fff}}
+  .hx summary:hover,.hx .leaf:hover{{background:#f6f9fd}}
+  .hx .arr{{display:inline-block;transition:transform .15s;font-size:10px;color:#9499a3}}
+  .hx details[open]>summary .arr{{transform:rotate(90deg)}}
+  .hx .nm.i1{{padding-left:32px}} .hx .nm.i2{{padding-left:50px}} .hx .nm.i3{{padding-left:68px}}
+  {_hx_mobile_css}
 </style>
 """, unsafe_allow_html=True)
     with card():

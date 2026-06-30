@@ -125,10 +125,29 @@ def recebimento_por_classificacao(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def inadimplencia_por_faixa(df: pd.DataFrame) -> pd.DataFrame:
-    """Clientes inadimplentes segmentados por faixa de dias em atraso."""
-    _inad = df[df["dias_atraso"] > 0].copy()
-    bins   = [0, 30, 60, 90, 180, float("inf")]
-    labels = ["1-30 dias", "31-60 dias", "61-90 dias", "91-180 dias", "180+ dias"]
+    """Clientes inadimplentes segmentados por faixa de dias em atraso.
+
+    Mesma base de "inadimplentes" do kpis_carteira (total - elegíveis): um
+    cliente com QUALQUER venda elegível conta como elegível ali, então aqui
+    também é excluído — mesmo tendo outra venda pendente. Dedupe por cliente
+    (maior atraso entre as vendas pendentes) p/ cada CPF cair em 1 faixa só —
+    soma das faixas bate exatamente com o total de inadimplentes do KPI.
+    """
+    _cpf_elegivel = set(df.loc[df["status_elegibilidade"] == "elegivel", "cpf_titular"])
+    _inad = (
+        df.loc[
+            (df["status_elegibilidade"] == "pendente")
+            & ~df["cpf_titular"].isin(_cpf_elegivel),
+            ["cpf_titular", "dias_atraso"],
+        ]
+        .groupby("cpf_titular", as_index=False)["dias_atraso"].max()
+    )
+    # dias_atraso==0 num cliente já marcado pendente é gap de dado do bronze
+    # (diasatraso nulo), não "sem atraso real" — bucket próprio em vez de
+    # descartar silenciosamente (senão a soma das faixas não bate com o KPI).
+    bins   = [-1, 0, 30, 60, 90, 180, float("inf")]
+    labels = ["Sem atraso informado", "1-30 dias", "31-60 dias", "61-90 dias",
+              "91-180 dias", "180+ dias"]
     _inad["faixa"] = pd.cut(_inad["dias_atraso"], bins=bins, labels=labels, right=True)
     return (
         _inad.groupby("faixa", as_index=False, observed=True)["cpf_titular"]
