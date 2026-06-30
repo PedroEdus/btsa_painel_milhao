@@ -540,7 +540,7 @@ with tabs[5]:
                           f'<span class="nm i2"><span class="arr">&#9654;</span> Empresa {_emp}</span>{_cells(_e)}</summary>')
                 for _, _row in _g3.iterrows():
                     _rows += (f'<div class="lv3 leaf">'
-                              f'<span class="nm i3">{_row["obra_nome"]}</span>{_cells(_row)}</div>')
+                              f'<span class="nm i3" tabindex="0">{_row["obra_nome"]}</span>{_cells(_row)}</div>')
                 _rows += '</details>'
             _rows += '</details>'
         _rows += '</details>'
@@ -565,6 +565,14 @@ with tabs[5]:
   .hx .nm{position:sticky;left:0;z-index:2;background:#fff;box-shadow:1px 0 0 #e6e8eb}
   .hx-head{z-index:3}
   .hx-head .nm{z-index:4;background:#f5f6f8}
+  /* Toque no nome do produto (folha) expande a celula p/ ver o texto
+     completo (igual .mtbl td.obra-cell em ui.py) — a coluna continua fixa
+     (sticky-left), entao da pra arrastar o resto da linha p/ ver os numeros
+     com o nome ja expandido. */
+  .hx .leaf .nm.i3{cursor:pointer}
+  .hx .leaf .nm.i3:focus{white-space:normal;width:max-content;max-width:260px;
+    justify-self:start;overflow:visible;outline:2px solid #9499a3;
+    z-index:5;background:#fff;padding-right:14px}
 """ if _mob else ""
     st.markdown(f"""
 <style>
