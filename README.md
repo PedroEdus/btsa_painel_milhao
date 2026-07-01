@@ -17,33 +17,36 @@ A ingestão e a view são responsabilidade do time de dados. Este repo **só lê
 ## Estrutura
 
 ```
-app.py                  # visão executiva (entrypoint)
-pages/                  # Evolução, Distribuições, Consulta de Cliente, Auditoria
+app.py                  # visão executiva (entrypoint, single-page com tabs)
 components/             # UI: cabeçalho/logo, KPIs, gráficos, formatação BR
 data/
   contract.py           # contrato de colunas da view (fonte da verdade)
-  mock.py               # dados mock fiéis ao contrato (USE_MOCK=true)
-  connection.py         # conexão Fabric (Azure AD service principal)
-  queries.py            # SQL de leitura da view
-  repository.py         # acesso único + cache TTL (mock ↔ Fabric)
+  onelake.py            # snapshot Parquet do OneLake (service principal Azure AD)
+  adapter.py            # bronze → schema interno do painel
+  repository.py         # acesso único + cache por janela de atualização (8h/15h BR)
 services/
   metrics.py            # regra de cupom + KPIs (único lugar com cálculo financeiro)
   validation.py         # contrato, tipos, duplicidade por venda
 config/settings.py      # parâmetros da campanha e regra de cupom (pendências = params)
 tests/                  # pytest
-packages.txt            # deps apt p/ Streamlit Community Cloud
 ```
 
 ## Rodar local
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env          # USE_MOCK=true já vem ligado
+cp .env.example .env          # preencher credenciais Azure (OneLake)
 streamlit run app.py
 ```
 
-Com `USE_MOCK=true` o painel roda sem Fabric, usando dados gerados com o mesmo
-contrato. Trocar para a view real só exige `USE_MOCK=false` + credenciais no `.env`.
+## Atualização dos dados
+
+A base do Fabric é atualizada **às 8h e às 15h (horário de Brasília)**. O
+painel cacheia por janela: só refaz a query do OneLake quando uma nova janela
+começa (com margem de `ATUALIZACAO_MARGEM_MINUTOS`, padrão 20 min → busca às
+8h20/15h20, p/ o pipeline terminar de gravar o snapshot). O carimbo "Atualizado" mostra o
+horário nominal da base vigente, no fuso BR. A página em modo TV recarrega
+sozinha na próxima janela.
 
 ## Testes
 
@@ -86,14 +89,6 @@ Para LIGAR:
 
 A base tem CPF, telefone, e-mail e valores. Community Cloud é hosting de
 terceiro — subir **dado real** depende de aval do Jurídico (CONTEXT 5.7/8.4).
-Com `USE_MOCK=true` não há dado real, então o MVP/demo é seguro.
-
-### ⚠️ Connector Fabric no Community Cloud
-
-O driver ODBC 18 da Microsoft **não** é instalável via `packages.txt` (não está
-no repo Debian padrão). Com `USE_MOCK=true` o deploy roda normal. Para conectar
-ao Fabric real do Cloud, revisar o connector (`data/connection.py`) — ex.:
-`pymssql`/FreeTDS — ou hospedar onde o driver MS seja permitido.
 
 ## Regra de cupom
 

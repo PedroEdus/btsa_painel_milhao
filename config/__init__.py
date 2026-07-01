@@ -1,3 +1,3 @@
-from config.settings import CACHE_TTL_SEGUNDOS, CAMPANHA, REGRA_CUPOM, USE_MOCK
+from config.settings import CAMPANHA, REGRA_CUPOM
 
-__all__ = ["CACHE_TTL_SEGUNDOS", "CAMPANHA", "REGRA_CUPOM", "USE_MOCK"]
+__all__ = ["CAMPANHA", "REGRA_CUPOM"]

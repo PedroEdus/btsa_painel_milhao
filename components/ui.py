@@ -26,7 +26,6 @@ from components.format import (
     percentual,
 )
 from components.theme import ACENTO, BRAND, FONT, PALETAS, RADIUS, SEMANTIC, aplicar_tema
-from config.settings import CACHE_TTL_SEGUNDOS
 
 _ASSETS = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets")
 LOGO_CLARA = os.path.join(_ASSETS, "logo_preta.png")     # fundo claro
@@ -86,7 +85,8 @@ def splash() -> None:
     """Animação lúdica de abertura: chuva de moedas + barras de ouro (CONTEXT 10.1).
 
     Só toca em CARGA REAL da página (sessão nova) — não em reruns/filtros.
-    O auto-reload de 10 min recria a sessão, então toca a cada atualização.
+    O auto-reload das janelas (8h/15h BR) recria a sessão, então toca a cada
+    atualização da base.
     """
     if st.session_state.get("_splashed"):
         return
@@ -146,11 +146,14 @@ def boot_tema() -> None:
     )
 
 
-def auto_refresh(segundos: int = CACHE_TTL_SEGUNDOS) -> None:
-    """Recarrega a página inteira a cada `segundos` (CONTEXT 9 — near real-time).
+def auto_refresh(segundos: int | None = None) -> None:
+    """Recarrega a página na próxima janela de atualização da base (8h/15h BR).
 
-    Full reload → cache expira → dados novos + splash toca de novo.
+    Full reload → janela nova no cache → dados novos + splash toca de novo.
     """
+    if segundos is None:
+        from data.repository import segundos_ate_proxima_atualizacao
+        segundos = segundos_ate_proxima_atualizacao()
     components.html(
         f"<script>setTimeout(function(){{window.parent.location.reload();}}, {segundos * 1000});</script>",
         height=0,

@@ -30,16 +30,14 @@ def _env_int(nome: str, padrao: int) -> int:
     return int(valor) if valor and valor.strip().isdigit() else padrao
 
 
-# ── Fonte de dados ──────────────────────────────────────────────────────────
-# Enquanto a view do Fabric não existe, USE_MOCK=true gera dados controlados
-# com o mesmo contrato esperado (CONTEXT seção 6/7).
-USE_MOCK: bool = _env_bool("USE_MOCK", True)
-
-# Cache / near real-time (CONTEXT seção 9). TTL em segundos.
-# Aceita CACHE_TTL_SECONDS (en) ou CACHE_TTL_SEGUNDOS (pt). Nunca cache eterno.
-CACHE_TTL_SEGUNDOS: int = _env_int(
-    "CACHE_TTL_SECONDS", _env_int("CACHE_TTL_SEGUNDOS", 600)
-)  # 10 min
+# ── Janela de atualização ───────────────────────────────────────────────────
+# A base do Fabric é atualizada às 8h e 15h (horário de Brasília). O painel só
+# recarrega dados nessas fronteiras — não há TTL fixo.
+TZ_BR = "America/Sao_Paulo"
+HORARIOS_ATUALIZACAO: tuple[int, ...] = (8, 15)
+# Margem (min) após o horário nominal p/ o pipeline terminar de gravar o
+# snapshot antes de o painel buscar dados novos → busca efetiva 8h20/15h20.
+ATUALIZACAO_MARGEM_MINUTOS: int = _env_int("ATUALIZACAO_MARGEM_MINUTOS", 20)
 
 # Limite de cupons disponíveis pela receita da empresa (teto = 100% do medidor).
 # 0 = automático: estima pelo potencial dos dados (recebido + vencido) / R$100.

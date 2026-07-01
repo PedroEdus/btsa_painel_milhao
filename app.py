@@ -35,7 +35,7 @@ from components import (
     tabela_html,
 )
 from components.ui import autoplay_tabs
-from config.settings import CACHE_TTL_SEGUNDOS, CAMPANHA, CUPONS_DISPONIVEIS, REGRA_CUPOM
+from config.settings import CAMPANHA, CUPONS_DISPONIVEIS, REGRA_CUPOM
 from data import carregar_dados, ultima_atualizacao
 from services import (
     calendario_sorteios,
@@ -89,12 +89,9 @@ st.markdown(
 exigir_login_btsa()
 
 
-@st.cache_data(ttl=CACHE_TTL_SEGUNDOS)
-def _base():
-    return preparar(carregar_dados())
-
-
-df = _base()
+# Cache fica em data.repository (keyado pela janela 8h/15h BR); preparar() é
+# passthrough quando o snapshot já traz cupons calculados pelo Fabric.
+df = preparar(carregar_dados())
 resultado = validar(df)
 
 page_header(
@@ -615,9 +612,15 @@ with tabs[5]:
             '<div class="card-sub">Detalhamento por regional, cidade, empresa e produto</div>',
             unsafe_allow_html=True,
         )
-        _hc2.download_button("Baixar CSV",
-                             _csv_mat.to_csv(index=False, sep=";", decimal=",").encode("utf-8"),
-                             "matriz_exportacao.csv", "text/csv")
+        # Fragment isola o rerun do clique — sem ele o download_button
+        # rerodava o script inteiro e o st.tabs voltava pra primeira aba.
+        @st.fragment
+        def _botao_csv():
+            st.download_button("Baixar CSV",
+                               _csv_mat.to_csv(index=False, sep=";", decimal=",").encode("utf-8"),
+                               "matriz_exportacao.csv", "text/csv")
+        with _hc2:
+            _botao_csv()
         st.markdown(f"""
 <div class="hx"><div class="hx-scroll">
   <div class="hx-head">

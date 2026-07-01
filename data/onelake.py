@@ -34,9 +34,12 @@ def _secret(key: str) -> str:
         return val
 
 
-@st.cache_data(ttl=300, show_spinner="Carregando snapshot do OneLake…")
 def load_painel_milhao_data() -> pd.DataFrame:
-    """Autentica no OneLake, localiza snapshot .parquet e retorna DataFrame."""
+    """Autentica no OneLake, localiza snapshot .parquet e retorna DataFrame.
+
+    Sem cache próprio — o cache (keyado pela janela 8h/15h) fica em
+    data.repository, único ponto de entrada do painel.
+    """
     from azure.identity import ClientSecretCredential
     from azure.storage.filedatalake import DataLakeServiceClient
 
