@@ -427,41 +427,8 @@ with tabs[4]:
          "icon": "fa-rotate-right", "cor": "green",
          "tooltip": "Pagamentos de parcelas em atraso recuperados no período. Não disponível nesta versão do snapshot."},
     ])
-    c1, c2 = st.columns([2, 1])
+    c1, c2 = st.columns([1, 1])
     with c1:
-        _top = top_obras(df, n=None)
-        _top_fmt = pd.DataFrame({
-            "Obra": _top["obra"],
-            "Total recebido": [moeda(v) for v in _top["valor"]],
-            "Cupons": [numero(int(v)) for v in _top["cupons"]],
-            "Média diária": [moeda(v) for v in _top["media_diaria"]],
-        })
-        with card("Ranking de obras por arrecadação", "Empreendimentos com maior volume de recebimentos"):
-            if _mob:
-                tabela_html(_top_fmt)  # HTML c/ 1a coluna fixa no mobile
-            else:
-                st.dataframe(
-                    _top_fmt,
-                    hide_index=True,
-                    height=700,
-                    width="stretch",
-                    column_config={
-                        "Obra": st.column_config.TextColumn("Obra", pinned=True, width="large"),
-                        "Total recebido": st.column_config.TextColumn(
-                            "Total recebido", width="small",
-                            help="Soma de todos os pagamentos recebidos pela obra no período do snapshot.",
-                        ),
-                        "Cupons": st.column_config.TextColumn(
-                            "Cupons", width="small",
-                            help="Cupons gerados pelos clientes da obra. Calculado pelo Fabric: R$ recebido ÷ R$ 100 por cupom.",
-                        ),
-                        "Média diária": st.column_config.TextColumn(
-                            "Média diária",
-                            help="Recebimento médio por dia com pagamento: Total recebido ÷ dias em que houve ao menos um pagamento na obra.",
-                        ),
-                    },
-                )
-    with c2:
         cupons_realizados = int(m["cupons_calculados"])
         cupons_limite = CUPONS_DISPONIVEIS or int(
             (m["valor_total_recebido"] + m["valor_vencido"]) / REGRA_CUPOM.valor_por_cupom
@@ -478,9 +445,43 @@ with tabs[4]:
                     "÷ R$ 100 por cupom. Mostra o quanto a campanha pode crescer "
                     "conforme a carteira é paga."
                 ))
+    with c2:
         barras(inadimplencia_por_faixa(df), "faixa", "clientes",
                "Inadimplência por faixa de atraso",
                "Clientes não aptos segmentados por dias em atraso")
+
+    _top = top_obras(df, n=None)
+    _top_fmt = pd.DataFrame({
+        "Obra": _top["obra"],
+        "Total recebido": [moeda(v) for v in _top["valor"]],
+        "Cupons": [numero(int(v)) for v in _top["cupons"]],
+        "Média diária": [moeda(v) for v in _top["media_diaria"]],
+    })
+    with card("Ranking de obras por arrecadação", "Empreendimentos com maior volume de recebimentos"):
+        if _mob:
+            tabela_html(_top_fmt)  # HTML c/ 1a coluna fixa no mobile
+        else:
+            st.dataframe(
+                _top_fmt,
+                hide_index=True,
+                height=700,
+                width="stretch",
+                column_config={
+                    "Obra": st.column_config.TextColumn("Obra", pinned=True, width="large"),
+                    "Total recebido": st.column_config.TextColumn(
+                        "Total recebido", width="small",
+                        help="Soma de todos os pagamentos recebidos pela obra no período do snapshot.",
+                    ),
+                    "Cupons": st.column_config.TextColumn(
+                        "Cupons", width="small",
+                        help="Cupons gerados pelos clientes da obra. Calculado pelo Fabric: R$ recebido ÷ R$ 100 por cupom.",
+                    ),
+                    "Média diária": st.column_config.TextColumn(
+                        "Média diária",
+                        help="Recebimento médio por dia com pagamento: Total recebido ÷ dias em que houve ao menos um pagamento na obra.",
+                    ),
+                },
+            )
 
 # ── Tab 5 — Exportação ───────────────────────────────────────────────────────
 with tabs[5]:
