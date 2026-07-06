@@ -80,22 +80,17 @@ def load_painel_milhao_data() -> pd.DataFrame:
         )
         st.stop()
 
-    parquet_path = parquet_paths[0]
-
-    # 5. Download
-    try:
-        file_client = fs.get_file_client(parquet_path)
-        data = file_client.download_file().readall()
-    except Exception as exc:
-        st.error(f"Falha ao baixar '{parquet_path}': {exc}")
-        st.stop()
-
-    # 6. Leitura com pandas + adaptação para schema interno
-    try:
-        raw = pd.read_parquet(io.BytesIO(data))
-    except Exception as exc:
-        st.error(f"Falha ao ler parquet: {exc}")
-        st.stop()
+    # 5/6. Download + leitura de TODOS os parts (Spark pode particionar o
+    # snapshot em vários part-*.parquet; ler só o primeiro perderia linhas).
+    partes = []
+    for parquet_path in parquet_paths:
+        try:
+            data = fs.get_file_client(parquet_path).download_file().readall()
+            partes.append(pd.read_parquet(io.BytesIO(data)))
+        except Exception as exc:
+            st.error(f"Falha ao baixar/ler '{parquet_path}': {exc}")
+            st.stop()
+    raw = partes[0] if len(partes) == 1 else pd.concat(partes, ignore_index=True)
 
     from data.adapter import adaptar
     return adaptar(raw)

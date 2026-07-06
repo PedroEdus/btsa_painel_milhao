@@ -165,7 +165,10 @@ def page_header(
     atualizado_em: datetime | None = None,
 ) -> None:
     """Cabeçalho de página (.ph do CGID). Aplica tema + logo na sidebar."""
-    _show_counter[0] = 0
+    # Contador de charts por SESSÃO (não módulo): módulo é compartilhado entre
+    # sessões/reruns concorrentes → reset de uma sessão colidia keys da outra
+    # (StreamlitDuplicateElementKey).
+    st.session_state["_chart_counter"] = 0
     tema_toggle()
     boot_tema()
     aplicar_tema()
@@ -625,7 +628,6 @@ def nota_regra(texto: str) -> None:
 
 
 # ── Gráficos — estilo v8 (ApexCharts → Plotly) ───────────────────────────────
-_show_counter: list[int] = [0]
 
 _V8_GRID  = "#F1F5F9"
 _V8_LABEL = "#6B7280"
@@ -690,7 +692,8 @@ def _show(fig, altura: int = 260, legenda: bool = True,
     )
     fig.update_xaxes(**_eixo, showgrid=False)
     fig.update_yaxes(**_eixo)
-    _show_counter[0] += 1
+    _n = st.session_state.get("_chart_counter", 0) + 1
+    st.session_state["_chart_counter"] = _n
     # staticPlot: gráfico sem interação (toque/scroll não agarram). Rótulos já
     # mostram os valores, então o hover não faz falta. Tabelas seguem interativas.
     # interativo=True: libera hover, mas trava zoom/scroll/drag p/ não agarrar.
@@ -700,7 +703,7 @@ def _show(fig, altura: int = 260, legenda: bool = True,
         fig.update_layout(dragmode=False)
     else:
         _cfg = {"displayModeBar": False, "staticPlot": True}
-    st.plotly_chart(fig, key=f"chart_{_show_counter[0]}", width="stretch",
+    st.plotly_chart(fig, key=f"chart_{_n}", width="stretch",
                     config=_cfg)
 
 

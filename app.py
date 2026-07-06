@@ -40,19 +40,21 @@ from data import carregar_dados, ultima_atualizacao
 from services import (
     calendario_sorteios,
     cupons_por_cidade,
+    cupons_media_dia_semana,
     cupons_por_mes,
+    cupons_por_tipo,
     exigir_login_btsa,
     funil_participacao,
     inadimplencia_por_cidade,
     inadimplencia_por_faixa,
     kpis_carteira,
     mes_referencia_atual,
+    novos_clientes,
     preparar,
     progresso_campanha,
     recebimento_diario,
     recebimento_mensal,
     recebimento_por_classificacao,
-    top_obras,
     validar,
 )
 
@@ -146,6 +148,7 @@ with tabs[0]:
         [
             f'<i class="fa-solid fa-ticket"></i> <b>{numero(m["cupons_calculados"])}</b> cupons calculados',
             f'<i class="fa-solid fa-users"></i> <b>{numero(m["clientes_participantes"])}</b> participantes',
+            f'<i class="fa-solid fa-city"></i> <b>{numero(df["cidade"].nunique())}</b> cidades participantes',
             f'<i class="fa-solid fa-calendar-check"></i> <b>{sorteios_realizados}/{sorteios_total}</b> sorteios realizados',
             f'<i class="fa-regular fa-clock"></i> <b>{prog["dias_restantes"]}</b> dias restantes',
         ],
@@ -170,9 +173,9 @@ with tabs[0]:
         {"label": "Cupons/dia (média)", "valor": numero(round(media_cupons_dia)),
          "icon": "fa-chart-line", "cor": "blue",
          "tooltip": "Média diária de cupons gerados: total de cupons ÷ dias com ao menos um recebimento (dias pagantes)."},
-        {"label": "Cidades participantes", "valor": numero(df["cidade"].nunique()),
-         "icon": "fa-city", "cor": "green",
-         "tooltip": "Municípios distintos com ao menos um cliente ativo no portfólio."},
+        {"label": "Novos clientes (campanha)", "valor": numero(novos_clientes(df)),
+         "icon": "fa-user-plus", "cor": "green",
+         "tooltip": "Clientes cuja PRIMEIRA venda ocorreu a partir de 01/07/2026 (início da campanha)."},
         {"label": "Saldo inadimplente hoje", "valor": moeda(m["valor_vencido"]),
          "icon": "fa-triangle-exclamation", "cor": "red",
          "tooltip": "Valor total vencido em aberto na carteira (valor_inadimplencia): saldo que clientes NÃO APTO devem na data do snapshot."},
@@ -423,6 +426,9 @@ with tabs[4]:
         {"label": "Taxa de elegibilidade", "valor": f"{taxa_cadastro:.1f}%",
          "icon": "fa-user-check", "cor": "amber",
          "tooltip": "% de clientes com status APTO sobre o total de participantes únicos (CPF) do portfólio."},
+        {"label": "Novos clientes (campanha)", "valor": numero(novos_clientes(df)),
+         "icon": "fa-user-plus", "cor": "blue",
+         "tooltip": "Clientes cuja PRIMEIRA venda ocorreu a partir de 01/07/2026 (início da campanha). Cliente antigo que comprou de novo não conta."},
         {"label": "Valor recuperado", "valor": moeda(m["valor_recuperado"]),
          "icon": "fa-rotate-right", "cor": "green",
          "tooltip": "Pagamentos de parcelas em atraso recuperados no período. Não disponível nesta versão do snapshot."},
@@ -450,38 +456,15 @@ with tabs[4]:
                "Inadimplência por faixa de atraso",
                "Clientes não aptos segmentados por dias em atraso")
 
-    _top = top_obras(df, n=None)
-    _top_fmt = pd.DataFrame({
-        "Obra": _top["obra"],
-        "Total recebido": [moeda(v) for v in _top["valor"]],
-        "Cupons": [numero(int(v)) for v in _top["cupons"]],
-        "Média diária": [moeda(v) for v in _top["media_diaria"]],
-    })
-    with card("Ranking de obras por arrecadação", "Empreendimentos com maior volume de recebimentos"):
-        if _mob:
-            tabela_html(_top_fmt)  # HTML c/ 1a coluna fixa no mobile
-        else:
-            st.dataframe(
-                _top_fmt,
-                hide_index=True,
-                height=700,
-                width="stretch",
-                column_config={
-                    "Obra": st.column_config.TextColumn("Obra", pinned=True, width="large"),
-                    "Total recebido": st.column_config.TextColumn(
-                        "Total recebido", width="small",
-                        help="Soma de todos os pagamentos recebidos pela obra no período do snapshot.",
-                    ),
-                    "Cupons": st.column_config.TextColumn(
-                        "Cupons", width="small",
-                        help="Cupons gerados pelos clientes da obra. Calculado pelo Fabric: R$ recebido ÷ R$ 100 por cupom.",
-                    ),
-                    "Média diária": st.column_config.TextColumn(
-                        "Média diária",
-                        help="Recebimento médio por dia com pagamento: Total recebido ÷ dias em que houve ao menos um pagamento na obra.",
-                    ),
-                },
-            )
+    c3, c4 = st.columns([1, 1])
+    with c3:
+        barras(cupons_media_dia_semana(df), "dia", "cupons",
+               "Média de cupons por dia da semana",
+               "Cupons gerados em média em cada dia da semana (por data de recebimento)")
+    with c4:
+        barras(cupons_por_tipo(df), "tipo", "cupons",
+               "Cupons por sorteio",
+               "Milhão (acumula até o final) × Casas (concorrem no mês)")
 
 # ── Tab 5 — Exportação ───────────────────────────────────────────────────────
 with tabs[5]:
@@ -491,6 +474,7 @@ with tabs[5]:
     _mat = (
         _df_exp.groupby(["regional", "cidade", "empresa_codigo", "obra_nome"], as_index=False)
         .agg(
+            empresa_nome=("empresa", "first"),
             clientes=("cpf_titular", "nunique"),
             elegiveis=("status_elegibilidade", lambda s: (s == "elegivel").sum()),
             inadimplentes=("status_elegibilidade", lambda s: (s == "pendente").sum()),
@@ -501,10 +485,14 @@ with tabs[5]:
         .reset_index(drop=True)
     )
 
-    _csv_mat = _mat.rename(columns={
-        "regional": "Regional", "cidade": "Cidade", "empresa_codigo": "Empresa",
-        "obra_nome": "Produto", "clientes": "Clientes", "elegiveis": "Elegíveis",
-        "inadimplentes": "Inadimplentes", "cupons": "Cupons", "recebido": "Recebido (R$)",
+    _csv_mat = _mat[[
+        "regional", "cidade", "empresa_codigo", "empresa_nome", "obra_nome",
+        "clientes", "elegiveis", "inadimplentes", "cupons", "recebido",
+    ]].rename(columns={
+        "regional": "Regional", "cidade": "Cidade", "empresa_codigo": "Cód. Empresa",
+        "empresa_nome": "Empresa", "obra_nome": "Produto", "clientes": "Clientes",
+        "elegiveis": "Elegíveis", "inadimplentes": "Inadimplentes",
+        "cupons": "Cupons", "recebido": "Recebido (R$)",
     })
     def _brl(v): return "R$ {:,.2f}".format(v).replace(",", "X").replace(".", ",").replace("X", ".")
     def _num(v): return "{:,}".format(int(v)).replace(",", ".")
@@ -534,8 +522,13 @@ with tabs[5]:
                       f'<span class="nm i1"><span class="arr">&#9654;</span> {_cid}</span>{_cells(_c)}</summary>')
             for _emp, _g3 in _g2.groupby("empresa_codigo"):
                 _e = _g3[["clientes","elegiveis","inadimplentes","cupons","recebido"]].sum()
+                # Snapshot novo traz nomeempresa; no antigo "empresa" é a
+                # constante "Brasil Terrenos" p/ todas → cai no código.
+                _emp_nome = str(_g3["empresa_nome"].iloc[0])
+                if _emp_nome in ("", "nan", "Brasil Terrenos"):
+                    _emp_nome = f"Empresa {_emp}"
                 _rows += (f'<details class="lv2"><summary>'
-                          f'<span class="nm i2"><span class="arr">&#9654;</span> Empresa {_emp}</span>{_cells(_e)}</summary>')
+                          f'<span class="nm i2"><span class="arr">&#9654;</span> {_emp_nome}</span>{_cells(_e)}</summary>')
                 for _, _row in _g3.iterrows():
                     _rows += (f'<div class="lv3 leaf">'
                               f'<span class="nm i3" tabindex="0">{_row["obra_nome"]}</span>{_cells(_row)}</div>')

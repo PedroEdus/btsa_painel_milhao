@@ -237,6 +237,72 @@ def tem_classificacao_origem(df: pd.DataFrame) -> bool:
     return any(c in df.columns for c in _COLS_DATA_VENDA)
 
 
+def novos_clientes(df: pd.DataFrame) -> int:
+    """Clientes novos: CPFs cuja PRIMEIRA venda ocorreu após o início da campanha.
+
+    Cliente antigo que comprou de novo pós-campanha não conta — só quem entrou
+    na base a partir de CAMPANHA.inicio. Sem data_venda no snapshot → 0.
+    """
+    if "data_venda" not in df.columns:
+        return 0
+    primeira = df.groupby("cpf_titular")["data_venda"].min()
+    return int((primeira >= pd.Timestamp(CAMPANHA.inicio)).sum())
+
+
+def novas_vendas_por_dia(df: pd.DataFrame) -> pd.DataFrame:
+    """Vendas fechadas a partir do início da campanha, contadas por dia."""
+    if "data_venda" not in df.columns:
+        return pd.DataFrame({"data": [], "vendas": []})
+    novas = df[df["data_venda"] >= pd.Timestamp(CAMPANHA.inicio)]
+    if novas.empty:
+        return pd.DataFrame({"data": [], "vendas": []})
+    return (
+        novas.groupby(novas["data_venda"].dt.date)["num_venda"]
+        .nunique()
+        .rename("vendas")
+        .reset_index()
+        .rename(columns={"data_venda": "data"})
+        .sort_values("data")
+    )
+
+
+def cupons_media_dia_semana(df: pd.DataFrame) -> pd.DataFrame:
+    """Média de cupons gerados por dia da semana.
+
+    Soma cupons por data de recebimento e tira a média entre as ocorrências
+    de cada dia da semana (2 segundas → média das 2).
+    """
+    valid = df[df["data_recebimento"].notna()]
+    por_dia = valid.groupby(valid["data_recebimento"].dt.date)["cupons_calculados"].sum()
+    if por_dia.empty:
+        return pd.DataFrame({"dia": [], "cupons": []})
+    _nomes = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
+    media = por_dia.groupby([d.weekday() for d in por_dia.index]).mean()
+    return pd.DataFrame({
+        "dia": [_nomes[i] for i in media.index],
+        "cupons": media.round(0).astype(int).values,
+    })
+
+
+def cupons_por_tipo(df: pd.DataFrame) -> pd.DataFrame:
+    """Cupons por tipo de sorteio: Milhão (acumulado) × Casas (atual/próximo).
+
+    Colunas de casas só existem no snapshot novo (07/2026) — ausentes, retorna
+    só o Milhão.
+    """
+    tipos = [
+        ("Milhão (final)", "cupons_calculados"),
+        ("Casas — sorteio atual", "cupons_casas_sorteio_atual"),
+        ("Casas — próximo sorteio", "cupons_casas_proximo_sorteio"),
+    ]
+    rows = [
+        {"tipo": nome, "cupons": int(pd.to_numeric(df[col], errors="coerce").fillna(0).sum())}
+        for nome, col in tipos
+        if col in df.columns
+    ]
+    return pd.DataFrame(rows)
+
+
 def top_obras(df: pd.DataFrame, n: int | None = 6) -> pd.DataFrame:
     """Obras por valor recebido (+ cupons + média diária). n=None → todas."""
     dias = (
