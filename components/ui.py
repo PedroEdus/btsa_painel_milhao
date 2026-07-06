@@ -840,8 +840,9 @@ def _faixa_cores_v8(valores: pd.Series) -> list[str]:
 def barras_cidades(df: pd.DataFrame, x: str, y: str, titulo: str, sub: str = "", is_monetary: bool = False) -> None:
     """Barras coluna coloridas por faixa — v8 ch0bar/ch1eng: borderRadius, hover darken, tooltip pt-BR."""
     with card(titulo, sub):
-        # Valores cheios (sem abreviação), label vertical acima da barra.
-        labels = [_moeda(v) if is_monetary else _numero(int(v)) for v in df[y]]
+        # Label horizontal acima da barra; monetário compacto (R$ 6,9 mi) p/
+        # não sobrepor — valor cheio no hover.
+        labels = [_moeda_compacta(v) if is_monetary else _numero(int(v)) for v in df[y]]
         fig = px.bar(df, x=x, y=y)
         cores = _faixa_cores_v8(df[y])
 
@@ -855,17 +856,17 @@ def barras_cidades(df: pd.DataFrame, x: str, y: str, titulo: str, sub: str = "",
             marker_line_width=0,
             marker_cornerradius=5,
             textposition="outside",
-            textangle=-90,
+            textangle=0,
             text=labels,
             textfont=dict(color="#1E293B", size=13, family=_V8_FONT),
             cliponaxis=False,
-            width=0.55,
+            width=0.6,
             name=titulo,
             hovertemplate=ht,
         )
         _maxy = float(df[y].max()) if len(df) else 1.0
-        # Monetário tem rótulo vertical mais comprido → precisa de mais headroom.
-        _topo = 2.4 if is_monetary else 1.8
+        # Label horizontal precisa de pouco headroom.
+        _topo = 1.22
         fig.update_layout(
             # Força o tamanho do rótulo (plotly encolhe texto externo que não cabe).
             uniformtext_minsize=13, uniformtext_mode="show",
@@ -874,7 +875,7 @@ def barras_cidades(df: pd.DataFrame, x: str, y: str, titulo: str, sub: str = "",
                        tickfont=dict(size=14, color="#475569", family=_V8_FONT)),
             xaxis=dict(title="", tickangle=-45 if len(df) > 6 else 0,
                        tickfont=dict(size=14, color="#334155", family=_V8_FONT)),
-            bargap=0.5,
+            bargap=0.3,
             hoverlabel=_v8_hoverlabel(),
         )
         _show(fig)
