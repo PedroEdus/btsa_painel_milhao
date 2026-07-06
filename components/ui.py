@@ -769,7 +769,8 @@ def linha_temporal(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str 
 
 def barras(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str = "",
            color: str | None = None, is_monetary: bool = False,
-           destaque: str | None = None, skip_card: bool = False) -> None:
+           destaque: str | None = None, skip_card: bool = False,
+           cor: str | None = None) -> None:
     """Barras coluna — v8: borderRadius 5, labels XK brancos dentro, tooltip pt-BR, hover darken."""
     with (card(titulo, sub) if not skip_card else _null_ctx()):
         # Label horizontal acima da barra. Monetário usa forma compacta
@@ -782,11 +783,12 @@ def barras(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str = "",
         else:
             ht = "<b>%{x}</b><br>Quantidade: <b>%{y:,.0f}</b><extra></extra>"
 
+        _cor_base = cor or BRAND["500"]
         if destaque is not None and destaque in set(df[x].astype(str)):
-            cores_barra = ["#e6b800" if str(v) == str(destaque) else BRAND["500"]
+            cores_barra = ["#e6b800" if str(v) == str(destaque) else _cor_base
                            for v in df[x]]
         else:
-            cores_barra = BRAND["500"]
+            cores_barra = _cor_base
 
         fig.update_traces(
             marker_color=cores_barra,
@@ -797,16 +799,18 @@ def barras(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str = "",
             text=labels,
             textfont=dict(color="#1E293B", size=13, family=_V8_FONT),
             cliponaxis=False,
-            width=0.45,
+            width=0.6,
             name=titulo,
             hovertemplate=ht,
         )
+        # Headroom 1.22x: label horizontal acima da barra precisa de pouco
+        # espaço — 1.5x deixava metade do gráfico vazia.
         _maxy = float(df[y].max()) if len(df) else 1.0
         fig.update_layout(
             yaxis=dict(showgrid=True, showticklabels=True, tickformat=".2s",
-                       title="", range=[0, _maxy * 1.5]),
+                       title="", range=[0, _maxy * 1.22]),
             xaxis=dict(title="", type="category"),
-            bargap=0.5,
+            bargap=0.3,
             hoverlabel=_v8_hoverlabel(),
         )
         _show(fig)

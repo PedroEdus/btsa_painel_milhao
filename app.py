@@ -454,7 +454,8 @@ with tabs[4]:
     with c2:
         barras(inadimplencia_por_faixa(df), "faixa", "clientes",
                "Inadimplência por faixa de atraso",
-               "Clientes não aptos segmentados por dias em atraso")
+               "Clientes não aptos segmentados por dias em atraso",
+               cor="#ef4444")
 
     c3, c4 = st.columns([1, 1])
     with c3:
