@@ -865,7 +865,9 @@ def barras_cidades(df: pd.DataFrame, x: str, y: str, titulo: str, sub: str = "",
         )
         _maxy = float(df[y].max()) if len(df) else 1.0
         # Monetário tem rótulo vertical mais comprido → precisa de mais headroom.
-        _topo = 2.4 if is_monetary else 1.8
+        # Gráfico mais alto (380) permite headroom proporcional menor: o rótulo
+        # vertical ocupa fração menor da altura → barras aproveitam mais espaço.
+        _topo = 1.55 if is_monetary else 1.35
         fig.update_layout(
             # Força o tamanho do rótulo (plotly encolhe texto externo que não cabe).
             uniformtext_minsize=13, uniformtext_mode="show",
@@ -877,7 +879,7 @@ def barras_cidades(df: pd.DataFrame, x: str, y: str, titulo: str, sub: str = "",
             bargap=0.5,
             hoverlabel=_v8_hoverlabel(),
         )
-        _show(fig)
+        _show(fig, 380)
 
 
 def progress_adimplencia(pct: float, meta: float = 70.0) -> None:
