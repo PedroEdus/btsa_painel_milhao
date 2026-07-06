@@ -467,17 +467,19 @@ with tabs[4]:
         barras(_fx, "faixa", "clientes",
                "Inadimplência por faixa de atraso",
                "Clientes não aptos segmentados por dias em atraso",
-               cor=_cores_fx, altura=420)
+               cor=_cores_fx, altura=270)
 
     c3, c4 = st.columns([1, 1])
     with c3:
         barras(cupons_media_dia_semana(df), "dia", "cupons",
                "Média de cupons por dia da semana",
-               "Cupons gerados em média em cada dia da semana (por data de recebimento)")
+               "Cupons gerados em média em cada dia da semana (por data de recebimento)",
+               altura=240)
     with c4:
         barras(cupons_por_tipo(df), "tipo", "cupons",
                "Cupons por sorteio",
-               "Milhão (acumula até o final) × Casas (concorrem no mês)")
+               "Milhão (acumula até o final) × Casas (concorrem no mês)",
+               altura=240)
 
 # ── Tab 5 — Exportação ───────────────────────────────────────────────────────
 with tabs[5]:

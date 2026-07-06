@@ -580,7 +580,7 @@ def medidor(valor: float, maximo: float, titulo: str, sub: str = "",
             xref="paper", yref="paper", xanchor="center",
             font=dict(size=46, color=BRAND["600"], family=_V8_FONT),
         )
-        _show(fig, 300)
+        _show(fig, 200)
         if nota:
             st.markdown(
                 f'<div style="font-size:12.5px;color:#475569;line-height:1.5;'
