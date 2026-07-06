@@ -770,7 +770,7 @@ def linha_temporal(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str 
 def barras(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str = "",
            color: str | None = None, is_monetary: bool = False,
            destaque: str | None = None, skip_card: bool = False,
-           cor: str | None = None) -> None:
+           cor: str | list[str] | None = None) -> None:
     """Barras coluna — v8: borderRadius 5, labels XK brancos dentro, tooltip pt-BR, hover darken."""
     with (card(titulo, sub) if not skip_card else _null_ctx()):
         # Label horizontal acima da barra. Monetário usa forma compacta

@@ -452,10 +452,16 @@ with tabs[4]:
                     "conforme a carteira é paga."
                 ))
     with c2:
-        barras(inadimplencia_por_faixa(df), "faixa", "clientes",
+        _fx = inadimplencia_por_faixa(df)
+        # Mesma paleta do gráfico por regional: verde escuro → amarelo conforme
+        # a faixa de atraso aumenta (posição, não valor).
+        _tons = ["#1B5E20", "#2E7D32", "#388E3C", "#fbbf24", "#f59e0b"]
+        _cores_fx = [_tons[int(i * (len(_tons) - 1) / max(len(_fx) - 1, 1))]
+                     for i in range(len(_fx))]
+        barras(_fx, "faixa", "clientes",
                "Inadimplência por faixa de atraso",
                "Clientes não aptos segmentados por dias em atraso",
-               cor="#ef4444")
+               cor=_cores_fx)
 
     c3, c4 = st.columns([1, 1])
     with c3:
