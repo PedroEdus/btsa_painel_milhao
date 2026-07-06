@@ -285,16 +285,22 @@ def cupons_media_dia_semana(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def cupons_por_tipo(df: pd.DataFrame) -> pd.DataFrame:
-    """Cupons por tipo de sorteio: Milhão (acumulado) × Casas (atual/próximo).
+    """Cupons por tipo de sorteio: Milhão (acumulado) × Casas.
 
-    Colunas de casas só existem no snapshot novo (07/2026) — ausentes, retorna
-    só o Milhão.
+    Query atual traz coluna única cupons_casas; formatos anteriores traziam
+    atual/próximo separados. Colunas ausentes são omitidas do resultado.
     """
-    tipos = [
-        ("Milhão (final)", "cupons_calculados"),
-        ("Casas — sorteio atual", "cupons_casas_sorteio_atual"),
-        ("Casas — próximo sorteio", "cupons_casas_proximo_sorteio"),
-    ]
+    if "cupons_casas" in df.columns:
+        tipos = [
+            ("Milhão (final)", "cupons_calculados"),
+            ("Casas (mês)", "cupons_casas"),
+        ]
+    else:
+        tipos = [
+            ("Milhão (final)", "cupons_calculados"),
+            ("Casas — sorteio atual", "cupons_casas_sorteio_atual"),
+            ("Casas — próximo sorteio", "cupons_casas_proximo_sorteio"),
+        ]
     rows = [
         {"tipo": nome, "cupons": int(pd.to_numeric(df[col], errors="coerce").fillna(0).sum())}
         for nome, col in tipos

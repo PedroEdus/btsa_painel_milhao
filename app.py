@@ -142,16 +142,21 @@ tabs = st.tabs([
 # ── Tab 0 — Visão Geral ───────────────────────────────────────────────────────
 with tabs[0]:
     banner_premiacao()
+    # Query atual: coluna única cupons_casas; formato anterior: sorteio atual.
+    _col_casas = next(
+        (c for c in ("cupons_casas", "cupons_casas_sorteio_atual") if c in df.columns),
+        None,
+    )
     _cupons_casa_atual = (
-        int(pd.to_numeric(df["cupons_casas_sorteio_atual"], errors="coerce").fillna(0).sum())
-        if "cupons_casas_sorteio_atual" in df.columns else 0
+        int(pd.to_numeric(df[_col_casas], errors="coerce").fillna(0).sum())
+        if _col_casas else 0
     )
     hero(
         "Arrecadação da campanha",
         moeda(m["valor_total_recebido"]),
         [
             f'<i class="fa-solid fa-ticket"></i> <b>{numero(m["cupons_calculados"])}</b> cupons do Milhão',
-            f'<i class="fa-solid fa-house"></i> <b>{numero(_cupons_casa_atual)}</b> cupons casas (sorteio atual)',
+            f'<i class="fa-solid fa-house"></i> <b>{numero(_cupons_casa_atual)}</b> cupons casas',
             f'<i class="fa-solid fa-users"></i> <b>{numero(m["clientes_participantes"])}</b> participantes',
             f'<i class="fa-solid fa-city"></i> <b>{numero(df["cidade"].nunique())}</b> cidades participantes',
             f'<i class="fa-solid fa-calendar-check"></i> <b>{sorteios_realizados}/{sorteios_total}</b> sorteios realizados',
