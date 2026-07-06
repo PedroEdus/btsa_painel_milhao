@@ -251,27 +251,9 @@ def autoplay_tabs(intervalo: int = 10, iniciar_ativo: bool = False) -> None:
             P._tvEnabled = {js_default};
           }}
 
-          // ── Barra de progresso ──────────────────────────────────────────
-          var bar = P.document.getElementById('_ap_bar');
-          if (!bar) {{
-            bar = P.document.createElement('div');
-            bar.id = '_ap_bar';
-            bar.style.cssText = [
-              'position:fixed','top:0','left:0','height:3px',
-              'background:{BRAND["500"]}','width:0%','z-index:99999',
-              'border-radius:0 3px 3px 0',
-              'box-shadow:0 0 8px rgba(42,125,50,.5)',
-              'pointer-events:none','transition:none'
-            ].join(';');
-            P.document.body.appendChild(bar);
-          }}
-
-          function resetBar() {{
-            bar.style.transition = 'none'; bar.style.width = '0%';
-            bar.getBoundingClientRect();
-            bar.style.transition = 'width {intervalo}s linear';
-            bar.style.width = '100%';
-          }}
+          // Remove a barra de progresso de versões anteriores (sessão antiga).
+          var _oldBar = P.document.getElementById('_ap_bar');
+          if (_oldBar) _oldBar.remove();
 
           function nextTab() {{
             var tabs = P.document.querySelectorAll('button[data-baseweb="tab"]');
@@ -280,25 +262,20 @@ def autoplay_tabs(intervalo: int = 10, iniciar_ativo: bool = False) -> None:
               return t.getAttribute('aria-selected') === 'true';
             }});
             tabs[(cur + 1) % tabs.length].click();
-            resetBar();
           }}
 
           P._stopAp = function() {{
             clearInterval(P._apTimer); P._apTimer = null; P._apRunning = false;
-            bar.style.transition = 'none'; bar.style.width = '0%';
           }};
 
           P._startAp = function() {{
             if (P._apRunning) return;
             P._apRunning = true;
-            bar.style.opacity = '1';
-            resetBar();
             P._apTimer = setInterval(nextTab, {intervalo * 1000});
           }};
 
           if (P._tvEnabled !== false && !P._apRunning) {{
             P._apRunning = true;
-            resetBar();
             P._apTimer = setInterval(nextTab, {intervalo * 1000});
           }}
 
