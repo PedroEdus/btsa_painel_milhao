@@ -21,6 +21,7 @@ import streamlit.components.v1 as components
 from components.format import (
     mes_ano_pt,
     moeda as _moeda,
+    moeda_compacta as _moeda_compacta,
     numero as _numero,
     pct_valor,
     percentual,
@@ -771,8 +772,9 @@ def barras(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str = "",
            destaque: str | None = None, skip_card: bool = False) -> None:
     """Barras coluna — v8: borderRadius 5, labels XK brancos dentro, tooltip pt-BR, hover darken."""
     with (card(titulo, sub) if not skip_card else _null_ctx()):
-        # Valores cheios (sem abreviação), label vertical acima da barra.
-        labels = [_moeda(v) if is_monetary else _numero(int(v)) for v in df[y]]
+        # Label horizontal acima da barra. Monetário usa forma compacta
+        # (R$ 1,2M) p/ não sobrepor entre barras; valor cheio fica no hover.
+        labels = [_moeda_compacta(v) if is_monetary else _numero(int(v)) for v in df[y]]
         fig = px.bar(df, x=x, y=y)
 
         if is_monetary:
@@ -791,9 +793,9 @@ def barras(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str = "",
             marker_line_width=0,
             marker_cornerradius=5,
             textposition="outside",
-            textangle=-90,
+            textangle=0,
             text=labels,
-            textfont=dict(color="#1E293B", size=10, family=_V8_FONT),
+            textfont=dict(color="#1E293B", size=13, family=_V8_FONT),
             cliponaxis=False,
             width=0.45,
             name=titulo,
