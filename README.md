@@ -5,6 +5,7 @@ Streamlit consumindo uma view consolidada no **Microsoft Fabric** (camada de
 consumo — nunca o banco operacional do UAU).
 
 > Contexto completo, regras de negócio e pendências: `CONTEXT_PAINEL_DO_MILHAO.md`.
+> Status atual e histórico do que já foi implementado: `STATUS_PROJETO.md`.
 
 ## Arquitetura
 
