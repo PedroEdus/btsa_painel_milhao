@@ -134,23 +134,32 @@ def adaptar(df: pd.DataFrame) -> pd.DataFrame:
     df["valor_multa"]     = 0.0
     df["valor_juros"]     = 0.0
     df["valor_custas"]    = 0.0
-    df["valor_recuperado"] = 0.0
 
     # ── Flags e defaults ─────────────────────────────────────────────────────
     # Recuperação = estava inadimplente e regularizou no mês.
-    if "inadimplente_no_mes_pago" in df.columns:
+    if "recuperacao" in df.columns:
+        # Query atual: flag explícita calculada pelo Fabric (estava inadimplente
+        # no fechamento e pagou). Fonte de verdade — nada de proxy.
+        _recup = pd.to_numeric(df["recuperacao"], errors="coerce").fillna(0) > 0
+    elif "inadimplente_no_mes_pago" in df.columns:
         _recup = df["inadimplente_no_mes_pago"].astype(str).str.strip().str.upper().str.startswith("S")
-        df["classificacao_recebimento"] = _recup.map({True: "recuperacao", False: "normal"})
     elif "pagou_parcela_mes_anterior" in df.columns:
-        # Query nova: proxy = não pagou a parcela do mês anterior mas está APTO
-        # agora → regularizou dentro do mês.
+        # Proxy fraco: não pagou a parcela do mês anterior mas está APTO agora.
         _recup = (
             df["pagou_parcela_mes_anterior"].astype(str).str.strip().str.upper().str.startswith("N")
             & _apto
         )
-        df["classificacao_recebimento"] = _recup.map({True: "recuperacao", False: "normal"})
     else:
-        df["classificacao_recebimento"] = "normal"
+        _recup = pd.Series(False, index=df.index)
+    df["classificacao_recebimento"] = _recup.map({True: "recuperacao", False: "normal"})
+    # Valor recuperado = o que os recuperados pagaram no período.
+    df["valor_recuperado"] = df["valor_total_recebido"].where(_recup, 0.0)
+    # Foto da inadimplência no fechamento de junho (início da campanha).
+    if "inad_junho" in df.columns:
+        _inad_jun = pd.to_numeric(df["inad_junho"], errors="coerce").fillna(0) > 0
+        df["status_inadimplencia_antes"] = _inad_jun.map(
+            {True: "inadimplente", False: "adimplente"}
+        )
     df["flag_vencido"]                = ~_apto
     df["participa_proximos_sorteios"] = _apto
     df["flag_antecipacao"]            = False
@@ -165,7 +174,8 @@ def adaptar(df: pd.DataFrame) -> pd.DataFrame:
     else:
         df["dias_atraso"] = 0
     df["qtd_parcelas_vencidas"]       = 0
-    df["status_inadimplencia_antes"]  = "adimplente"
+    if "status_inadimplencia_antes" not in df.columns:  # setado acima via inad_junho
+        df["status_inadimplencia_antes"] = "adimplente"
     df["status_apos_pagamento"]       = "adimplente"
 
     return df

@@ -73,6 +73,10 @@ def kpis_executivos(df: pd.DataFrame) -> dict[str, float]:
             df.loc[df["status_elegibilidade"] == "elegivel", "cpf_titular"].nunique()
         ),
         "valor_recuperado": float(df.get("valor_recuperado", pd.Series(dtype=float)).sum()),
+        "clientes_recuperados": (
+            int(df.loc[df["classificacao_recebimento"] == "recuperacao", "cpf_titular"].nunique())
+            if "classificacao_recebimento" in df.columns else 0
+        ),
     }
 
 

@@ -197,7 +197,7 @@ with tabs[0]:
          "tooltip": "Valor médio pago por pagante: total recebido ÷ número de pagantes (CPFs com recebimento > 0)."},
         {"label": "Valor recuperado", "valor": moeda(m["valor_recuperado"]),
          "icon": "fa-rotate-right", "cor": "amber",
-         "tooltip": "Pagamentos de parcelas em atraso recuperados no período. Não disponível nesta versão do snapshot."},
+         "tooltip": "Pagamentos de clientes que estavam inadimplentes no fechamento de junho e regularizaram no período (flag Recuperação da base)."},
     ])
     # Adimplência × inadimplência consolidadas num único bloco (CONTEXT item 4).
     comparativo_carteira(
@@ -347,7 +347,7 @@ with tabs[2]:
          "tooltip": "Sorteios já realizados conforme o calendário da campanha (jul/2026 a jan/2027)."},
         {"label": "Valor recuperado", "valor": moeda(m["valor_recuperado"]),
          "icon": "fa-rotate-right", "cor": "green",
-         "tooltip": "Pagamentos de parcelas em atraso recuperados no período. Não disponível nesta versão do snapshot."},
+         "tooltip": "Pagamentos de clientes que estavam inadimplentes no fechamento de junho e regularizaram no período (flag Recuperação da base)."},
     ])
     @st.fragment
     def _bloco_recebimento():
@@ -439,9 +439,12 @@ with tabs[4]:
         {"label": "Novos clientes (campanha)", "valor": numero(novos_clientes(df)),
          "icon": "fa-user-plus", "cor": "blue",
          "tooltip": "Clientes cuja PRIMEIRA venda ocorreu a partir de 01/07/2026 (início da campanha). Cliente antigo que comprou de novo não conta."},
+        {"label": "Clientes recuperados", "valor": numero(m["clientes_recuperados"]),
+         "icon": "fa-user-check", "cor": "green",
+         "tooltip": "Clientes que estavam inadimplentes no fechamento de junho e regularizaram no período (flag Recuperação da base). É a conversão da campanha."},
         {"label": "Valor recuperado", "valor": moeda(m["valor_recuperado"]),
          "icon": "fa-rotate-right", "cor": "green",
-         "tooltip": "Pagamentos de parcelas em atraso recuperados no período. Não disponível nesta versão do snapshot."},
+         "tooltip": "Pagamentos de clientes que estavam inadimplentes no fechamento de junho e regularizaram no período (flag Recuperação da base)."},
     ])
     c1, c2 = st.columns([1, 1])
     with c1:
