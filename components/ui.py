@@ -499,11 +499,13 @@ def donut(df: pd.DataFrame, names: str, values: str, titulo: str, sub: str = "",
             hovertemplate=ht,
             pull=[0.02] * len(df),
         )
+        # Fonte menor p/ "R$ X.XXX.XXX" caber no buraco da rosca (era só o
+        # número, sem moeda, com fonte maior).
         fig.add_annotation(
-            text=f"<b>{_numero(total)}</b><br><span style='font-size:9.5px;color:#94A3B8;"
+            text=f"<b>{_moeda(total)}</b><br><span style='font-size:9.5px;color:#94A3B8;"
                  f"letter-spacing:.5px'>TOTAL</span>",
             x=0.5, y=0.5, showarrow=False,
-            font=dict(size=20, color="#0F172A", family=_V8_FONT),
+            font=dict(size=14, color="#0F172A", family=_V8_FONT),
             xref="paper", yref="paper", align="center",
         )
         fig.update_layout(
