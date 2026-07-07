@@ -847,7 +847,9 @@ def barras_cidades(df: pd.DataFrame, x: str, y: str, titulo: str, sub: str = "",
             marker_line_width=0,
             marker_cornerradius=5,
             textposition="outside",
-            textangle=0,
+            # Monetário (R$ 6.852.484,29) é comprido demais p/ horizontal sem
+            # sobrepor barras vizinhas — mantém vertical só nesse caso.
+            textangle=-90 if is_monetary else 0,
             text=labels,
             textfont=dict(color="#1E293B", size=13, family=_V8_FONT),
             cliponaxis=False,
@@ -856,8 +858,7 @@ def barras_cidades(df: pd.DataFrame, x: str, y: str, titulo: str, sub: str = "",
             hovertemplate=ht,
         )
         _maxy = float(df[y].max()) if len(df) else 1.0
-        # Label horizontal precisa de pouco headroom.
-        _topo = 1.22
+        _topo = 1.55 if is_monetary else 1.22
         fig.update_layout(
             # Força o tamanho do rótulo (plotly encolhe texto externo que não cabe).
             uniformtext_minsize=13, uniformtext_mode="show",
