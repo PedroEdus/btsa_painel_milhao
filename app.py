@@ -180,9 +180,9 @@ with tabs[0]:
     )
     _dias_atraso_medio = df.loc[df["dias_atraso"] > 0, "dias_atraso"].mean() or 0
     stat_cards([
-        {"label": "Cupons/dia (média)", "valor": numero(round(media_cupons_dia)),
+        {"label": "Cupons do Milhão/dia (média)", "valor": numero(round(media_cupons_dia)),
          "icon": "fa-chart-line", "cor": "blue",
-         "tooltip": "Média diária de cupons gerados: total de cupons ÷ dias com ao menos um recebimento (dias pagantes)."},
+         "tooltip": "Média diária de cupons do sorteio do Milhão: total de cupons ÷ dias com ao menos um recebimento (dias pagantes)."},
         {"label": "Novos clientes (campanha)", "valor": numero(novos_clientes(df)),
          "icon": "fa-user-plus", "cor": "green",
          "tooltip": "Clientes cuja PRIMEIRA venda ocorreu a partir de 01/07/2026 (início da campanha)."},
@@ -214,9 +214,9 @@ with tabs[1]:
         {"label": "Cidades participantes", "valor": numero(_n_cid),
          "icon": "fa-city", "cor": "blue",
          "tooltip": "Municípios distintos com ao menos um cliente ativo no portfólio."},
-        {"label": "Cupons / cidade (média)", "valor": numero(round(m["cupons_calculados"] / _n_cid)),
+        {"label": "Cupons do Milhão / cidade (média)", "valor": numero(round(m["cupons_calculados"] / _n_cid)),
          "icon": "fa-ticket", "cor": "green",
-         "tooltip": "Média de cupons gerados por município: total de cupons ÷ número de cidades participantes."},
+         "tooltip": "Média de cupons do sorteio do Milhão por município: total de cupons ÷ número de cidades participantes."},
         {"label": "Elegíveis / cidade (média)", "valor": numero(round(m["clientes_elegiveis"] / _n_cid)),
          "icon": "fa-circle-check", "cor": "green",
          "tooltip": "Média de clientes APTO por município: total de elegíveis ÷ número de cidades participantes."},
@@ -232,7 +232,7 @@ with tabs[1]:
         )
         barras_cidades(
             por_reg_cup, "regional", "cupons_calculados",
-            "Engajamento por regional — cupons gerados",
+            "Engajamento por regional — cupons do Milhão",
             "Performance: verde=alto · âmbar=médio · vermelho=baixo",
         )
     with c2:
@@ -339,9 +339,9 @@ with tabs[2]:
         {"label": "Inadimplentes", "valor": numero(m["inadimplentes"]),
          "icon": "fa-ban", "cor": "red",
          "tooltip": "Clientes com status NÃO APTO: possuem parcelas vencidas e não participam dos sorteios mensais."},
-        {"label": "Cupons calculados", "valor": numero(m["cupons_calculados"]),
+        {"label": "Cupons do Milhão", "valor": numero(m["cupons_calculados"]),
          "icon": "fa-ticket", "cor": "blue",
-         "tooltip": "Gerado pelo Fabric: soma de cupons por venda. Regra: 1 cupom a cada R$100 de pagamento válido no mês de referência."},
+         "tooltip": "Cupons do sorteio final do Milhão. Gerado pelo Fabric: soma de cupons por venda. Regra: 1 cupom a cada R$100 de pagamento válido no mês de referência."},
         {"label": "Sorteios realizados", "valor": f"{sorteios_realizados} / {sorteios_total}",
          "icon": "fa-trophy", "cor": "amber",
          "tooltip": "Sorteios já realizados conforme o calendário da campanha (jul/2026 a jan/2027)."},
@@ -378,7 +378,7 @@ with tabs[2]:
         _cupons_mes = cupons_por_mes(df).copy()
         _cupons_mes["mes_referencia"] = _cupons_mes["mes_referencia"].map(mes_extenso_pt)
         barras(_cupons_mes, "mes_referencia", "cupons_calculados",
-               "Cupons por mês (concorrem ao sorteio do mês)",
+               "Cupons do Milhão por mês (concorrem ao sorteio do mês)",
                "Mês atual destacado · acumulado concorre ao prêmio final de R$ 1 milhão",
                destaque=mes_extenso_pt(mes_referencia_atual()))
     with c4:
@@ -422,7 +422,7 @@ with tabs[3]:
                "Elegíveis × pendentes por obra", status=True, altura=580)
     with c2:
         tabela(top_clientes, "Ranking de 15 clientes por cupons",
-               "Clientes com maior volume de cupons gerados", status=True, altura=580)
+               "Clientes com maior volume de cupons do Milhão gerados", status=True, altura=580)
 
 # ── Tab 4 — Indicadores Executivos ───────────────────────────────────────────
 with tabs[4]:
@@ -430,9 +430,9 @@ with tabs[4]:
         {"label": "Ticket médio (por venda)", "valor": moeda(m["ticket_medio"]),
          "icon": "fa-file-invoice-dollar", "cor": "green",
          "tooltip": "Valor médio recebido por venda: total recebido ÷ número de vendas únicas ativas no período."},
-        {"label": "Cupons / cliente apto", "valor": str(m["cupons_por_cliente_apto"]),
+        {"label": "Cupons do Milhão / cliente apto", "valor": str(m["cupons_por_cliente_apto"]),
          "icon": "fa-ticket", "cor": "blue",
-         "tooltip": "Média de cupons gerados por cliente elegível: total de cupons ÷ total de clientes com status APTO."},
+         "tooltip": "Média de cupons do sorteio do Milhão por cliente elegível: total de cupons ÷ total de clientes com status APTO."},
         {"label": "Taxa de elegibilidade", "valor": f"{taxa_cadastro:.1f}%",
          "icon": "fa-user-check", "cor": "amber",
          "tooltip": "% de clientes com status APTO sobre o total de participantes únicos (CPF) do portfólio."},
@@ -454,8 +454,8 @@ with tabs[4]:
         )
         _pct_cupons = 100 * cupons_realizados / max(cupons_limite, 1)
         medidor(_pct_cupons, 100,
-                "Aproveitamento de cupons",
-                "Quanto dos cupons possíveis já foi gerado",
+                "Aproveitamento de cupons do Milhão",
+                "Quanto dos cupons do sorteio do Milhão possíveis já foi gerado",
                 sufixo="%", numformat=".1f",
                 nota=(
                     f"<b>{numero(cupons_realizados)}</b> cupons já gerados de "
@@ -480,8 +480,8 @@ with tabs[4]:
     c3, c4 = st.columns([1, 1])
     with c3:
         barras(cupons_media_dia_semana(df), "dia", "cupons",
-               "Média de cupons por dia da semana",
-               "Cupons gerados em média em cada dia da semana (por data de recebimento)",
+               "Média de cupons do Milhão por dia da semana",
+               "Cupons do Milhão gerados em média em cada dia da semana (por data de recebimento)",
                altura=240)
     with c4:
         barras(cupons_por_tipo(df), "tipo", "cupons",
