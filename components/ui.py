@@ -255,9 +255,24 @@ def autoplay_tabs(intervalo: int = 10, iniciar_ativo: bool = False) -> None:
           var _oldBar = P.document.getElementById('_ap_bar');
           if (_oldBar) _oldBar.remove();
 
+          function findTabs() {{
+            // data-baseweb depende da versão interna do Streamlit (BaseWeb) —
+            // requirements.txt não trava versão, então cai p/ role ARIA
+            // (padrão estável) se o seletor específico não bater.
+            var sels = ['button[data-baseweb="tab"]', '[role="tab"]'];
+            for (var i = 0; i < sels.length; i++) {{
+              var found = P.document.querySelectorAll(sels[i]);
+              if (found.length) return found;
+            }}
+            return [];
+          }}
+
           function nextTab() {{
-            var tabs = P.document.querySelectorAll('button[data-baseweb="tab"]');
-            if (!tabs.length) return;
+            var tabs = findTabs();
+            if (!tabs.length) {{
+              console.warn('[autoplay_tabs] nenhuma aba encontrada — seletor desatualizado?');
+              return;
+            }}
             var cur = Array.from(tabs).findIndex(function(t) {{
               return t.getAttribute('aria-selected') === 'true';
             }});
