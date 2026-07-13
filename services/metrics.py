@@ -17,6 +17,17 @@ import pandas as pd
 
 from components.format import mes_ano_pt
 from config.settings import CAMPANHA, REGRA_CUPOM
+from data.contract import CHAVE_VENDA
+
+
+def id_contrato(df: pd.DataFrame) -> pd.Series:
+    """ID único de contrato (venda) — CHAVE_VENDA: empresa+obra+num_venda.
+
+    Paradigma do painel (CONTEXT decisão): elegibilidade/inadimplência/funil
+    contam por CONTRATO, não por cliente — uma venda pode ter vários
+    compradores (qtd_compradores) que não devem inflar a contagem.
+    """
+    return df[list(CHAVE_VENDA)].astype(str).agg("|".join, axis=1)
 
 
 def adicionar_valor_elegivel(df: pd.DataFrame, regra=REGRA_CUPOM) -> pd.DataFrame:
@@ -59,22 +70,35 @@ def preparar(df: pd.DataFrame, regra=REGRA_CUPOM) -> pd.DataFrame:
 
 
 def kpis_executivos(df: pd.DataFrame) -> dict[str, float]:
-    """Indicadores da visão executiva (CONTEXT 10.2)."""
+    """Indicadores da visão executiva (CONTEXT 10.2).
+
+    clientes_participantes é a ÚNICA métrica por cliente (cpf_titular) — fica
+    reservada pro card inicial "quantidade de clientes únicos". Cadastro,
+    elegibilidade e recuperação contam por CONTRATO (id_contrato).
+    """
     elegivel = df["valor_elegivel"] if "valor_elegivel" in df else pd.Series(dtype=float)
+    contrato = id_contrato(df)
     return {
         "valor_total_recebido": float(df["valor_total_recebido"].sum()),
         "valor_elegivel": float(elegivel.sum()),
         "cupons_calculados": int(df.get("cupons_calculados", pd.Series(dtype="Int64")).sum()),
         "clientes_participantes": int(df["cpf_titular"].nunique()),
-        "clientes_cadastrados": int(
-            df.loc[df["status_cadastro"] == "cadastrado", "cpf_titular"].nunique()
+        "contratos_participantes": int(contrato.nunique()),
+        "contratos_cadastrados": int(
+            contrato[df["status_cadastro"] == "cadastrado"].nunique()
         ),
-        "clientes_elegiveis": int(
-            df.loc[df["status_elegibilidade"] == "elegivel", "cpf_titular"].nunique()
+        "contratos_elegiveis": int(
+            contrato[df["status_elegibilidade"] == "elegivel"].nunique()
+        ),
+        # Cupons de contratos APTO — só esses concorrem de fato ao sorteio.
+        "cupons_elegiveis": int(
+            df.loc[df["status_elegibilidade"] == "elegivel", "cupons_calculados"]
+            .fillna(0).sum()
+            if "cupons_calculados" in df.columns else 0
         ),
         "valor_recuperado": float(df.get("valor_recuperado", pd.Series(dtype=float)).sum()),
-        "clientes_recuperados": (
-            int(df.loc[df["classificacao_recebimento"] == "recuperacao", "cpf_titular"].nunique())
+        "contratos_recuperados": (
+            int(contrato[df["classificacao_recebimento"] == "recuperacao"].nunique())
             if "classificacao_recebimento" in df.columns else 0
         ),
     }
@@ -120,33 +144,59 @@ def recebimento_diario(df: pd.DataFrame) -> pd.DataFrame:
     return diario
 
 
-def recebimento_por_classificacao(df: pd.DataFrame) -> pd.DataFrame:
-    """Normal vs recuperação (CONTEXT 10.3)."""
-    return (
-        df.groupby("classificacao_recebimento", as_index=False)["valor_total_recebido"]
-        .sum()
-    )
+def recebimento_por_origem(df: pd.DataFrame) -> pd.DataFrame:
+    """Recebimento no padrão da empresa (reunião 09/07 — Robson):
+
+    Em dia      = parcela do mês vigente paga dentro do mês
+    Recuperado  = parcela de meses anteriores (paga após o vencimento)
+    Antecipado  = parcela de mês futuro
+
+    Valores reais da query 10/07 (Valor Recuperado / Valor Antecipado);
+    Em dia = total − recuperado − antecipado. Origens zeradas são omitidas.
+    """
+    total = float(df["valor_total_recebido"].sum())
+    recuperado = float(df.get("valor_recuperado", pd.Series(dtype=float)).sum())
+    antecipado = float(df.get("valor_antecipado", pd.Series(dtype=float)).sum())
+    em_dia = max(0.0, total - recuperado - antecipado)
+    linhas = pd.DataFrame({
+        "origem": ["Em dia", "Recuperado", "Antecipado"],
+        "valor": [em_dia, recuperado, antecipado],
+    })
+    return linhas[linhas["valor"] > 0].reset_index(drop=True)
 
 
 def inadimplencia_por_faixa(df: pd.DataFrame) -> pd.DataFrame:
-    """Clientes inadimplentes segmentados por faixa de dias em atraso.
+    """Contratos inadimplentes segmentados por faixa de dias em atraso.
 
-    Mesma base de "inadimplentes" do kpis_carteira (total - elegíveis): um
-    cliente com QUALQUER venda elegível conta como elegível ali, então aqui
-    também é excluído — mesmo tendo outra venda pendente. Dedupe por cliente
-    (maior atraso entre as vendas pendentes) p/ cada CPF cair em 1 faixa só —
+    Mesma base de "contratos_inadimplentes" do kpis_carteira (total -
+    elegíveis): um contrato com QUALQUER venda elegível conta como elegível
+    ali, então aqui também é excluído. Dedupe por contrato (maior atraso
+    entre as ocorrências pendentes) p/ cada contrato cair em 1 faixa só —
     soma das faixas bate exatamente com o total de inadimplentes do KPI.
+
+    Retorna "contratos" (quantidade) e "valor" (VGV — soma de
+    valor_vencido_antes dos contratos da faixa) pra alternar a visualização.
     """
-    _cpf_elegivel = set(df.loc[df["status_elegibilidade"] == "elegivel", "cpf_titular"])
-    _inad = (
-        df.loc[
-            (df["status_elegibilidade"] == "pendente")
-            & ~df["cpf_titular"].isin(_cpf_elegivel),
-            ["cpf_titular", "dias_atraso"],
-        ]
-        .groupby("cpf_titular", as_index=False)["dias_atraso"].max()
+    df = df.copy()
+    df["_contrato"] = id_contrato(df)
+    _contrato_elegivel = set(df.loc[df["status_elegibilidade"] == "elegivel", "_contrato"])
+    _mask = (
+        (df["status_elegibilidade"] == "pendente")
+        & ~df["_contrato"].isin(_contrato_elegivel)
     )
-    # dias_atraso==0 num cliente já marcado pendente é gap de dado do bronze
+    _inad = (
+        df.loc[_mask, ["_contrato", "dias_atraso"]]
+        .groupby("_contrato", as_index=False)["dias_atraso"].max()
+    )
+    if "valor_vencido_antes" in df.columns:
+        _valor = (
+            df.loc[_mask, ["_contrato", "valor_vencido_antes"]]
+            .groupby("_contrato", as_index=False)["valor_vencido_antes"].sum()
+        )
+        _inad = _inad.merge(_valor, on="_contrato", how="left")
+    else:
+        _inad["valor_vencido_antes"] = 0.0
+    # dias_atraso==0 num contrato já marcado pendente é gap de dado do bronze
     # (diasatraso nulo), não "sem atraso real" — bucket próprio em vez de
     # descartar silenciosamente (senão a soma das faixas não bate com o KPI).
     bins   = [-1, 0, 30, 60, 90, 180, float("inf")]
@@ -154,30 +204,32 @@ def inadimplencia_por_faixa(df: pd.DataFrame) -> pd.DataFrame:
               "91-180 dias", "180+ dias"]
     _inad["faixa"] = pd.cut(_inad["dias_atraso"], bins=bins, labels=labels, right=True)
     return (
-        _inad.groupby("faixa", as_index=False, observed=True)["cpf_titular"]
-        .nunique()
-        .rename(columns={"cpf_titular": "clientes"})
+        _inad.groupby("faixa", as_index=False, observed=True)
+        .agg(contratos=("_contrato", "nunique"), valor=("valor_vencido_antes", "sum"))
     )
 
 
 def funil_participacao(df: pd.DataFrame) -> pd.DataFrame:
     """Funil real da campanha (CONTEXT 7 — não inventar etapa de cadastro).
 
-    Fluxo: Base total → Elegíveis → Geraram cupons. A etapa 'Cadastrados' do
-    contrato é incluída SOMENTE se trouxer sinal próprio (diferente de elegíveis);
-    no mock/dado atual cadastro==elegibilidade, então é omitida para não induzir
-    leitura falsa. Cupons gerados = clientes com cupons_calculados > 0.
+    Fluxo: Base total → Elegíveis → Geraram cupons, contado por CONTRATO
+    (paradigma do painel — uma venda com vários compradores não deve inflar
+    a contagem). A etapa 'Cadastrados' é incluída SOMENTE se trouxer sinal
+    próprio (diferente de elegíveis); no mock/dado atual cadastro==elegibilidade,
+    então é omitida para não induzir leitura falsa. Geraram cupons = contratos
+    elegíveis com cupons_calculados > 0.
     """
-    base = df["cpf_titular"].nunique()
+    contrato = id_contrato(df)
+    base = contrato.nunique()
     elegivel_mask = df["status_elegibilidade"] == "elegivel"
-    ele = df.loc[elegivel_mask, "cpf_titular"].nunique()
+    ele = contrato[elegivel_mask].nunique()
 
     # Geraram cupons = elegíveis que efetivamente têm cupom (subconjunto dos
     # elegíveis → funil monotônico). Cupom é calculado sobre o recebimento, mas
     # só o elegível concorre, então a etapa final filtra por elegibilidade.
     if "cupons_calculados" in df.columns:
-        com_cupom = df.loc[
-            elegivel_mask & (df["cupons_calculados"].fillna(0) > 0), "cpf_titular"
+        com_cupom = contrato[
+            elegivel_mask & (df["cupons_calculados"].fillna(0) > 0)
         ].nunique()
     else:
         com_cupom = ele
@@ -187,12 +239,12 @@ def funil_participacao(df: pd.DataFrame) -> pd.DataFrame:
 
     # Inclui 'Cadastrados' só se for sinal independente (≠ elegíveis).
     if "status_cadastro" in df.columns:
-        cad = df.loc[df["status_cadastro"] == "cadastrado", "cpf_titular"].nunique()
+        cad = contrato[df["status_cadastro"] == "cadastrado"].nunique()
         if cad != ele:
             etapas.insert(1, "Cadastrados")
             valores.insert(1, cad)
 
-    return pd.DataFrame({"etapa": etapas, "clientes": valores})
+    return pd.DataFrame({"etapa": etapas, "contratos": valores})
 
 
 # ── Mês de referência atual (CONTEXT 6 — destaque dinâmico, nunca hardcoded) ──
@@ -288,6 +340,60 @@ def cupons_media_dia_semana(df: pd.DataFrame) -> pd.DataFrame:
     })
 
 
+def clientes_por_dia_semana(df: pd.DataFrame) -> pd.DataFrame:
+    """Novos clientes × clientes recuperados por dia da semana.
+
+    Novos: CPFs cuja PRIMEIRA venda ocorreu na campanha, no dia da semana da
+    venda. Recuperados: CPFs com flag de recuperação, no dia da semana do
+    último recebimento (data que regularizou).
+    """
+    _nomes = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
+    novos = pd.Series(0, index=range(7))
+    if "data_venda" in df.columns:
+        primeira = df.groupby("cpf_titular")["data_venda"].min().dropna()
+        primeira = primeira[primeira >= pd.Timestamp(CAMPANHA.inicio)]
+        novos = primeira.dt.weekday.value_counts().reindex(range(7), fill_value=0)
+    rec = pd.Series(0, index=range(7))
+    if "classificacao_recebimento" in df.columns and "data_recebimento" in df.columns:
+        r = (
+            df.loc[df["classificacao_recebimento"] == "recuperacao"]
+            .dropna(subset=["data_recebimento"])
+            .groupby("cpf_titular")["data_recebimento"].max()
+        )
+        rec = r.dt.weekday.value_counts().reindex(range(7), fill_value=0)
+    return pd.DataFrame({
+        "dia": _nomes,
+        "novos": novos.values.astype(int),
+        "recuperados": rec.values.astype(int),
+    })
+
+
+def clientes_serie_diaria(df: pd.DataFrame, tipo: str = "novos") -> pd.DataFrame:
+    """Série diária de clientes (data, quantidade, acumulado).
+
+    tipo="novos": CPFs pela data da 1ª venda na campanha.
+    tipo="recuperados": CPFs recuperados pela data do último recebimento
+    (dia em que o inadimplente regularizou).
+    """
+    if tipo == "novos":
+        if "data_venda" not in df.columns:
+            return pd.DataFrame({"data": [], "quantidade": [], "acumulado": []})
+        s = df.groupby("cpf_titular")["data_venda"].min().dropna()
+        s = s[s >= pd.Timestamp(CAMPANHA.inicio)]
+    else:
+        if "classificacao_recebimento" not in df.columns:
+            return pd.DataFrame({"data": [], "quantidade": [], "acumulado": []})
+        s = (
+            df.loc[df["classificacao_recebimento"] == "recuperacao"]
+            .dropna(subset=["data_recebimento"])
+            .groupby("cpf_titular")["data_recebimento"].max()
+        )
+    por_dia = s.dt.date.value_counts().sort_index()
+    out = pd.DataFrame({"data": por_dia.index, "quantidade": por_dia.values})
+    out["acumulado"] = out["quantidade"].cumsum()
+    return out
+
+
 def cupons_por_tipo(df: pd.DataFrame) -> pd.DataFrame:
     """Cupons por tipo de sorteio: Milhão (acumulado) × Casas.
 
@@ -334,22 +440,25 @@ def top_obras(df: pd.DataFrame, n: int | None = 6) -> pd.DataFrame:
 
 
 def kpis_carteira(df: pd.DataFrame) -> dict[str, float | int]:
-    """Extend kpis_executivos com adimplência, inadimplência e ticket médio."""
+    """Extend kpis_executivos com adimplência, inadimplência e ticket médio.
+
+    total/elegiveis/inadimplentes são por CONTRATO (paradigma do painel);
+    clientes_participantes fica reservado pro card inicial de clientes únicos.
+    """
     base = kpis_executivos(df)
-    total = base["clientes_participantes"]
-    elegiveis = base["clientes_elegiveis"]
-    n_vendas = df["num_venda"].nunique()
+    total = base["contratos_participantes"]
+    elegiveis = base["contratos_elegiveis"]
     valor_vencido = (
         float(df["valor_vencido_antes"].fillna(0).sum())
         if "valor_vencido_antes" in df.columns else 0.0
     )
     return {
         **base,
-        "inadimplentes": total - elegiveis,
+        "contratos_inadimplentes": total - elegiveis,
         "pct_adimplencia": round(100 * elegiveis / total, 1) if total else 0.0,
         "valor_vencido": valor_vencido,
-        "ticket_medio": float(df["valor_total_recebido"].sum()) / n_vendas if n_vendas else 0.0,
-        "cupons_por_cliente_apto": round(base["cupons_calculados"] / elegiveis, 1) if elegiveis else 0.0,
+        "ticket_medio": float(df["valor_total_recebido"].sum()) / total if total else 0.0,
+        "cupons_por_contrato_apto": round(base["cupons_calculados"] / elegiveis, 1) if elegiveis else 0.0,
     }
 
 

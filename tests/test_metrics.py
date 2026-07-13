@@ -15,6 +15,7 @@ def _df(principal, multa=0.0, juros=0.0, custas=0.0):
         "valor_total_recebido": principal + multa + juros + custas,
         "cpf_titular": "1", "status_cadastro": "cadastrado",
         "status_elegibilidade": "elegivel", "valor_recuperado": 0.0,
+        "empresa": "E1", "obra": "O1", "num_venda": "V1",
     }])
 
 
@@ -54,3 +55,37 @@ def test_kpis_contam_clientes_unicos():
     m = kpis_executivos(df)
     assert m["clientes_participantes"] == 1
     assert m["cupons_calculados"] == 5
+
+
+def test_kpis_contam_contratos_nao_clientes():
+    # 1 contrato (mesma empresa/obra/num_venda) com 2 compradores não deve
+    # virar 2 contratos elegíveis — paradigma do painel é por CONTRATO.
+    df = pd.concat([_df(500), _df(500)], ignore_index=True)
+    df.loc[1, "cpf_titular"] = "2"  # segundo comprador do mesmo contrato
+    df = adicionar_cupons(adicionar_valor_elegivel(df))
+    m = kpis_executivos(df)
+    assert m["clientes_participantes"] == 2
+    assert m["contratos_participantes"] == 1
+    assert m["contratos_elegiveis"] == 1
+
+
+def test_recebimento_por_origem_em_dia_recuperado_antecipado():
+    # Padrão da empresa (reunião 09/07): em dia = total - recuperado - antecipado.
+    from services.metrics import recebimento_por_origem
+    df = pd.DataFrame({
+        "valor_total_recebido": [1000.0, 500.0],
+        "valor_recuperado": [300.0, 0.0],
+        "valor_antecipado": [0.0, 200.0],
+    })
+    out = recebimento_por_origem(df).set_index("origem")["valor"]
+    assert out["Em dia"] == 1000.0
+    assert out["Recuperado"] == 300.0
+    assert out["Antecipado"] == 200.0
+
+
+def test_recebimento_por_origem_omite_zerados():
+    from services.metrics import recebimento_por_origem
+    df = pd.DataFrame({"valor_total_recebido": [100.0],
+                       "valor_recuperado": [0.0], "valor_antecipado": [0.0]})
+    out = recebimento_por_origem(df)
+    assert list(out["origem"]) == ["Em dia"]

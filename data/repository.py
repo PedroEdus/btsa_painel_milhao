@@ -7,11 +7,15 @@ janela começa (fronteira + margem p/ o pipeline gravar o snapshot).
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from config.settings import (
     ATUALIZACAO_MARGEM_MINUTOS,
@@ -55,6 +59,13 @@ def segundos_ate_proxima_atualizacao() -> int:
 @st.cache_data(ttl=12 * 3600, show_spinner="Carregando dados da campanha…")
 def _carregar(janela: str) -> pd.DataFrame:
     # `janela` existe só p/ keyar o cache: muda às 8h/15h BR → nova query.
+    # SNAPSHOT_LOCAL (.env): parquet local no formato bronze — usado enquanto
+    # a query nova (10/07, 50 cols) ainda não está no Fabric. Remover a var
+    # volta ao OneLake.
+    _local = os.getenv("SNAPSHOT_LOCAL", "")
+    if _local:
+        from data.adapter import adaptar
+        return adaptar(pd.read_parquet(_local))
     from data.onelake import load_painel_milhao_data
     return load_painel_milhao_data()
 

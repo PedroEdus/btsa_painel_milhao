@@ -408,22 +408,27 @@ def stat_cards(cards: list[dict]) -> None:
 
 
 def comparativo_carteira(
-    adimplentes: int, inadimplentes: int, valor_vencido: float = 0.0,
+    adimplentes: int, inadimplentes: int, valor_vencido: float = 0.0, unidade: str = "contratos",
+    clientes_unicos: int | None = None,
 ) -> None:
     """Bloco único comparando adimplentes × inadimplentes (CONTEXT item 4).
 
     Consolida os dois stat-cards antes separados, com proporção visual e % da
     carteira. Percentuais via cálculo seguro (sem divisão por zero).
+    `unidade` rotula a base (contratos por padrão — paradigma do painel).
+    `clientes_unicos`, se passado, mostra a contagem por CPF ao lado da base
+    de contratos — mesma carteira, duas unidades de leitura.
     """
     total = adimplentes + inadimplentes
     pct_ok = pct_valor(adimplentes, total)
     pct_bad = pct_valor(inadimplentes, total)
     venc = f' · {_moeda(valor_vencido)} vencidos' if valor_vencido else ""
+    cli = f' ({_numero(clientes_unicos)} clientes únicos)' if clientes_unicos is not None else ""
     st.markdown(
         f"""
         <div class="cmp-wrap">
           <div class="cmp-hd">Situação da carteira</div>
-          <div class="cmp-sub">Elegíveis participam dos sorteios · base de {_numero(total)} clientes{venc}</div>
+          <div class="cmp-sub">Elegíveis participam dos sorteios · base de {_numero(total)} {unidade}{cli}{venc}</div>
           <div class="cmp-grid">
             <div class="cmp-cell ok">
               <div class="cmp-cap"><i class="fa-solid fa-user-check"></i> Adimplentes</div>
@@ -480,11 +485,17 @@ def hero(label: str, valor: str, chips: list[str]) -> None:
 
 
 def donut(df: pd.DataFrame, names: str, values: str, titulo: str, sub: str = "",
-          cores: dict | None = None) -> None:
+          cores: dict | None = None, rotulo_hover: str = "Recebido",
+          descricoes: dict[str, str] | None = None, skip_card: bool = False,
+          is_monetary: bool = True, altura: int = 260) -> None:
     """Donut — v8: hole 60%, separador branco grosso, total no centro, legenda lateral com
-    pct grande, nome e contagem, hover com detalhes, pull leve."""
-    with card(titulo, sub):
-        total = int(df[values].sum())
+    pct grande, nome e contagem, hover com detalhes, pull leve.
+
+    `is_monetary=False` formata centro/legenda/hover como contagem (sem R$).
+    `skip_card=True` p/ renderizar dentro de um card já aberto (ex.: toggle)."""
+    with (card(titulo, sub) if not skip_card else _null_ctx()):
+        total = float(df[values].sum())
+        _fmt_val = (lambda v: _moeda(v)) if is_monetary else (lambda v: _numero(int(v)))
         _default_colors = [BRAND["600"], SEMANTIC["danger_500"], ACENTO["amber"],
                             BRAND["300"], SEMANTIC["info_500"]]
         color_seq = list(cores.values()) if cores else _default_colors
@@ -492,7 +503,9 @@ def donut(df: pd.DataFrame, names: str, values: str, titulo: str, sub: str = "",
         fig = px.pie(df, names=names, values=values, hole=.60,
                      color=names, color_discrete_map=cores,
                      color_discrete_sequence=color_seq)
-        ht = "<b>%{label}</b><br>Recebido: <b>R$ %{value:,.2f}</b> (%{percent:.1%})<extra></extra>"
+        ht = ("<b>%{label}</b><br>" + rotulo_hover
+              + (": <b>R$ %{value:,.2f}</b>" if is_monetary else ": <b>%{value:,.0f}</b>")
+              + " (%{percent:.1%})<extra></extra>")
         fig.update_traces(
             textinfo="none",
             marker=dict(line=dict(color="#fff", width=3)),
@@ -502,7 +515,7 @@ def donut(df: pd.DataFrame, names: str, values: str, titulo: str, sub: str = "",
         # Fonte menor p/ "R$ X.XXX.XXX" caber no buraco da rosca (era só o
         # número, sem moeda, com fonte maior).
         fig.add_annotation(
-            text=f"<b>{_moeda(total)}</b><br><span style='font-size:9.5px;color:#94A3B8;"
+            text=f"<b>{_fmt_val(total)}</b><br><span style='font-size:9.5px;color:#94A3B8;"
                  f"letter-spacing:.5px'>TOTAL</span>",
             x=0.5, y=0.5, showarrow=False,
             font=dict(size=14, color="#0F172A", family=_V8_FONT),
@@ -524,7 +537,7 @@ def donut(df: pd.DataFrame, names: str, values: str, titulo: str, sub: str = "",
             pct = 100 * row[values] / total if total else 0
             nm = str(row[names])
             cor = name_to_color.get(nm, BRAND["500"])
-            val_fmt = _moeda(row[values]) if row[values] > 1000 else _numero(int(row[values]))
+            val_fmt = _fmt_val(row[values])
             legend_items.append(
                 f'<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px">'
                 f'<span style="width:11px;height:11px;border-radius:3px;background:{cor};'
@@ -540,13 +553,29 @@ def donut(df: pd.DataFrame, names: str, values: str, titulo: str, sub: str = "",
             )
 
         # Donut à esquerda (coluna larga p/ centralizar), legenda à direita.
+        # Rosca e legenda com a MESMA altura — senão a legenda define o card e
+        # a rosca fica pequena com espaço em branco sobrando (feedback 13/07).
         cols = st.columns([1.7, 1])
         with cols[0]:
-            _show(fig, 260, legenda=False)
+            _show(fig, altura, legenda=False)
         with cols[1]:
             st.markdown(
-                '<div style="display:flex;flex-direction:column;justify-content:center;'
-                'height:320px;padding:4px 0 4px 8px">' + "".join(legend_items) + "</div>",
+                f'<div style="display:flex;flex-direction:column;justify-content:center;'
+                f'height:{altura}px;padding:4px 0 4px 8px">' + "".join(legend_items) + "</div>",
+                unsafe_allow_html=True,
+            )
+        if descricoes:
+            # Linha de definições com ícone (?) — mesmo padrão do funil.
+            st.markdown(_STAT_TIP_CSS, unsafe_allow_html=True)
+            _itens = "".join(
+                f'<span style="font-size:12px;color:#475569;font-weight:600;'
+                f'display:inline-flex;align-items:center;gap:2px">{nome}'
+                f'<span class="stat-tip" data-tip="{desc.replace(chr(34), "&quot;")}">?</span></span>'
+                for nome, desc in descricoes.items()
+            )
+            st.markdown(
+                f'<div style="display:flex;gap:18px;flex-wrap:wrap;'
+                f'padding:2px 4px 6px">{_itens}</div>',
                 unsafe_allow_html=True,
             )
 
@@ -584,7 +613,10 @@ def medidor(valor: float, maximo: float, titulo: str, sub: str = "",
             )
 
 
-def funil(df: pd.DataFrame, x: str, y: str, titulo: str, sub: str = "") -> None:
+def funil(df: pd.DataFrame, x: str, y: str, titulo: str, sub: str = "",
+          descricoes: dict[str, str] | None = None, altura: int = 260) -> None:
+    """Funil de etapas. `descricoes` {etapa: texto} vira hover + linha de
+    legendas com ícone (?) abaixo do gráfico (pedido Robson 09/07)."""
     with card(titulo, sub):
         fig = px.funnel(df, x=x, y=y)
         # Texto com valor cheio pt-BR (sem abreviação SI do plotly) + % inicial.
@@ -594,13 +626,33 @@ def funil(df: pd.DataFrame, x: str, y: str, titulo: str, sub: str = "") -> None:
             for v in df[x]
         ]
         fig.update_traces(marker_color=BRAND["500"], text=_txt, textinfo="text",
-                          textfont_size=13, name=titulo)
+                          textfont_size=16, name=titulo)
+        if descricoes:
+            fig.update_traces(
+                customdata=[descricoes.get(str(e), "") for e in df[y]],
+                hovertemplate="<b>%{y}</b>: %{x:,}<br>%{customdata}<extra></extra>",
+            )
         fig.update_layout(
             xaxis=dict(title="", showticklabels=False, showgrid=False),
-            yaxis=dict(title=""),
+            yaxis=dict(title="", tickfont=dict(size=15, color="#334155",
+                                               family=_V8_FONT)),
             hoverlabel=_v8_hoverlabel(),
         )
-        _show(fig, 260)
+        _show(fig, altura)
+        if descricoes:
+            # Reusa o tooltip dos stat-cards (.stat-tip) — CSS idempotente.
+            st.markdown(_STAT_TIP_CSS, unsafe_allow_html=True)
+            _itens = "".join(
+                f'<span style="font-size:12px;color:#475569;font-weight:600;'
+                f'display:inline-flex;align-items:center;gap:2px">{etapa}'
+                f'<span class="stat-tip" data-tip="{desc.replace(chr(34), "&quot;")}">?</span></span>'
+                for etapa, desc in descricoes.items()
+            )
+            st.markdown(
+                f'<div style="display:flex;gap:18px;flex-wrap:wrap;'
+                f'padding:2px 4px 6px">{_itens}</div>',
+                unsafe_allow_html=True,
+            )
 
 
 def selo_calculado_vs_oficial() -> None:
@@ -703,21 +755,26 @@ def _show(fig, altura: int = 260, legenda: bool = True,
 
 
 def linha_temporal(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str = "",
-                   skip_card: bool = False) -> None:
-    """Área suave — v8: fill gradiente, markers brancos, anotação no último."""
+                   skip_card: bool = False, is_monetary: bool = True,
+                   col_diaria: str = "valor_total_recebido", altura: int = 260) -> None:
+    """Área suave — v8: fill gradiente, markers brancos, anotação no último.
+
+    `is_monetary=False` formata hover/total como contagem (sem R$).
+    `col_diaria`: coluna do valor do dia p/ o hover (além do acumulado)."""
     ctx = card(titulo, sub) if not skip_card else _null_ctx()
     with ctx:
         fig = px.area(df, x=x, y=y, line_shape="spline")
         # Valor por ponto (diário): mostra "No dia" + "Acumulado" no hover quando
         # a coluna existe; senão cai p/ só acumulado.
-        _diaria = "valor_total_recebido"
-        if _diaria in df.columns:
-            customdata = df[[_diaria]].to_numpy()
-            ht = ("<b>%{x}</b><br>No dia: <b>R$ %{customdata[0]:,.2f}</b>"
-                  "<br>Acumulado: <b>R$ %{y:,.2f}</b><extra></extra>")
+        _v = "R$ %{customdata[0]:,.2f}" if is_monetary else "%{customdata[0]:,.0f}"
+        _a = "R$ %{y:,.2f}" if is_monetary else "%{y:,.0f}"
+        if col_diaria in df.columns:
+            customdata = df[[col_diaria]].to_numpy()
+            ht = (f"<b>%{{x}}</b><br>No dia: <b>{_v}</b>"
+                  f"<br>Acumulado: <b>{_a}</b><extra></extra>")
         else:
             customdata = None
-            ht = "<b>%{x}</b><br>Acumulado: <b>R$ %{y:,.2f}</b><extra></extra>"
+            ht = f"<b>%{{x}}</b><br>Acumulado: <b>{_a}</b><extra></extra>"
         fig.update_traces(
             line=dict(color=BRAND["500"], width=2.5),
             fillcolor="rgba(46,125,50,.12)",
@@ -744,7 +801,8 @@ def linha_temporal(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str 
                 pass
             fig.add_annotation(
                 x=last_x, y=0,
-                text=f"Total: R$ {_fmt_k(last_y)}",
+                text=(f"Total: R$ {_fmt_k(last_y)}" if is_monetary
+                      else f"Total: {_numero(int(last_y))}"),
                 showarrow=False,
                 xref="x", yref="paper",
                 yanchor="top", xanchor="center",
@@ -758,7 +816,7 @@ def linha_temporal(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str 
             xaxis=dict(tickangle=0, tickformat="%d/%m"),
             hovermode="x unified",
         )
-        _show(fig, interativo=True)
+        _show(fig, altura, interativo=True)
 
 
 def barras(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str = "",
@@ -767,9 +825,9 @@ def barras(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str = "",
            cor: str | list[str] | None = None, altura: int = 260) -> None:
     """Barras coluna — v8: borderRadius 5, labels XK brancos dentro, tooltip pt-BR, hover darken."""
     with (card(titulo, sub) if not skip_card else _null_ctx()):
-        # Label horizontal acima da barra. Monetário usa forma compacta
-        # (R$ 1,2M) p/ não sobrepor entre barras; valor cheio fica no hover.
-        labels = [_moeda_compacta(v) if is_monetary else _numero(int(v)) for v in df[y]]
+        # Monetário: valor ÍNTEGRO verticalizado acima da barra (mesmo padrão
+        # do barras_cidades — decisão 13/07, sem abreviação R$ X mi).
+        labels = [_moeda(v) if is_monetary else _numero(int(v)) for v in df[y]]
         fig = px.bar(df, x=x, y=y)
 
         if is_monetary:
@@ -789,7 +847,9 @@ def barras(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str = "",
             marker_line_width=0,
             marker_cornerradius=5,
             textposition="outside",
-            textangle=0,
+            # Monetário íntegro (R$ 1.234.567,89) é comprido — vertical p/ não
+            # sobrepor barras vizinhas (mesma regra do barras_cidades).
+            textangle=-90 if is_monetary else 0,
             text=labels,
             textfont=dict(color="#1E293B", size=13, family=_V8_FONT),
             cliponaxis=False,
@@ -797,17 +857,45 @@ def barras(df: pd.DataFrame, x: str, y: str, titulo: str = "", sub: str = "",
             name=titulo,
             hovertemplate=ht,
         )
-        # Headroom 1.22x: label horizontal acima da barra precisa de pouco
-        # espaço — 1.5x deixava metade do gráfico vazia.
+        # Headroom: label horizontal precisa de pouco espaço (1.22x); label
+        # monetário vertical é comprido → 1.55x pra não cortar no topo.
         _maxy = float(df[y].max()) if len(df) else 1.0
+        _topo = 1.55 if is_monetary else 1.22
         fig.update_layout(
+            uniformtext_minsize=13, uniformtext_mode="show",
             yaxis=dict(showgrid=True, showticklabels=True, tickformat=".2s",
-                       title="", range=[0, _maxy * 1.22]),
+                       title="", range=[0, _maxy * _topo]),
             xaxis=dict(title="", type="category"),
             bargap=0.3,
             hoverlabel=_v8_hoverlabel(),
         )
         _show(fig, altura)
+
+
+def barras_agrupadas(df: pd.DataFrame, x: str, series: list[tuple[str, str, str]],
+                     titulo: str, sub: str = "", altura: int = 260) -> None:
+    """Barras agrupadas (2+ séries lado a lado). series: [(coluna, rótulo, cor)]."""
+    with card(titulo, sub):
+        fig = go.Figure()
+        for col, rotulo, cor in series:
+            fig.add_bar(
+                x=df[x], y=df[col], name=rotulo,
+                marker_color=cor, marker_line_width=0, marker_cornerradius=4,
+                text=[_numero(int(v)) for v in df[col]],
+                textposition="outside",
+                textfont=dict(color="#1E293B", size=12, family=_V8_FONT),
+                cliponaxis=False,
+                hovertemplate="<b>%{x}</b><br>" + rotulo + ": <b>%{y:,.0f}</b><extra></extra>",
+            )
+        _maxy = float(df[[c for c, _, _ in series]].to_numpy().max()) if len(df) else 1.0
+        fig.update_layout(
+            barmode="group", bargap=0.3, bargroupgap=0.12,
+            yaxis=dict(showgrid=True, tickformat=".2s", title="",
+                       range=[0, _maxy * 1.25]),
+            xaxis=dict(title="", type="category"),
+            hoverlabel=_v8_hoverlabel(),
+        )
+        _show(fig, altura, legenda=True)
 
 
 def _faixa_cores_v8(valores: pd.Series) -> list[str]:
@@ -831,18 +919,42 @@ def _faixa_cores_v8(valores: pd.Series) -> list[str]:
     return resultado
 
 
-def barras_cidades(df: pd.DataFrame, x: str, y: str, titulo: str, sub: str = "", is_monetary: bool = False) -> None:
-    """Barras coluna coloridas por faixa — v8 ch0bar/ch1eng: borderRadius, hover darken, tooltip pt-BR."""
-    with card(titulo, sub):
+def barras_cidades(df: pd.DataFrame, x: str, y: str, titulo: str, sub: str = "",
+                    is_monetary: bool = False, casas: int = 0, rotulo_hover: str = "Cupons",
+                    is_percent: bool = False, chip: str | None = None,
+                    chip_icon: str = "fa-coins") -> None:
+    """Barras coluna coloridas por faixa — v8 ch0bar/ch1eng: borderRadius, hover darken, tooltip pt-BR.
+
+    `casas` controla decimais do rótulo/hover quando não monetário (ex.: médias per-capita).
+    `is_percent` formata rótulo/hover como percentual (12,3%).
+    `chip` (opcional): badge de totalizador no canto superior direito do card."""
+    _ctx = card() if chip else card(titulo, sub)
+    with _ctx:
+        if chip:
+            _sub_html = f'<div class="card-sub">{sub}</div>' if sub else ""
+            st.markdown(
+                f'<div class="card-hd" style="display:flex;justify-content:space-between;'
+                f'gap:12px;align-items:flex-start">'
+                f'<div><div class="card-title">{titulo}</div>{_sub_html}</div>'
+                f'{badge(chip, "green", chip_icon)}</div>',
+                unsafe_allow_html=True,
+            )
         # Valores cheios (sem abreviação), label vertical acima da barra.
-        labels = [_moeda(v) if is_monetary else _numero(int(v)) for v in df[y]]
+        if is_monetary:
+            labels = [_moeda(v) for v in df[y]]
+        elif is_percent:
+            labels = [f"{v:.1f}%".replace(".", ",") for v in df[y]]
+        else:
+            labels = [f"{v:,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", ".") for v in df[y]]
         fig = px.bar(df, x=x, y=y)
         cores = _faixa_cores_v8(df[y])
 
         if is_monetary:
             ht = "<b>%{x}</b><br>Valor: <b>R$ %{y:,.2f}</b><extra></extra>"
+        elif is_percent:
+            ht = "<b>%{x}</b><br>" + rotulo_hover + ": <b>%{y:.1f}%</b><extra></extra>"
         else:
-            ht = "<b>%{x}</b><br>Cupons: <b>%{y:,.0f}</b><extra></extra>"
+            ht = "<b>%{x}</b><br>" + rotulo_hover + f": <b>%{{y:,.{casas}f}}</b><extra></extra>"
 
         fig.update_traces(
             marker_color=cores,
@@ -890,7 +1002,7 @@ def progress_adimplencia(pct: float, meta: float = 70.0) -> None:
           <div class="prog-adim-row">
             <div>
               <div class="prog-adim-title">Adimplência da carteira</div>
-              <div class="prog-adim-sub">Meta: {meta:.0f}% — clientes elegíveis participam dos sorteios</div>
+              <div class="prog-adim-sub">Meta: {meta:.0f}% — contratos elegíveis participam dos sorteios</div>
             </div>
             <div style="text-align:right">
               <div class="prog-adim-pct" style="color:{val_cor}">{pct:.1f}%</div>

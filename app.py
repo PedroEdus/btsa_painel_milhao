@@ -39,13 +39,14 @@ from config.settings import CAMPANHA, CUPONS_DISPONIVEIS, REGRA_CUPOM
 from data import carregar_dados, ultima_atualizacao
 from services import (
     calendario_sorteios,
+    clientes_serie_diaria,
     cupons_por_cidade,
     cupons_media_dia_semana,
     cupons_por_mes,
     cupons_por_tipo,
     exigir_login_btsa,
     funil_participacao,
-    inadimplencia_por_cidade,
+    id_contrato,
     inadimplencia_por_faixa,
     kpis_carteira,
     mes_referencia_atual,
@@ -54,7 +55,7 @@ from services import (
     progresso_campanha,
     recebimento_diario,
     recebimento_mensal,
-    recebimento_por_classificacao,
+    recebimento_por_origem,
     validar,
 )
 
@@ -71,8 +72,8 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    #MainMenu, footer, header[data-testid="stHeader"],
-    [data-testid="stToolbar"], [data-testid="stToolbarActions"],
+    #MainMenu, footer,
+    [data-testid="stToolbarActions"],
     [data-testid="stDecoration"], [data-testid="stStatusWidget"],
     [data-testid="stAppDeployButton"], [data-testid="stMainMenuButton"],
     [data-testid="manage-app-button"],
@@ -81,6 +82,12 @@ st.markdown(
     [class*="viewerBadge_container"], [class*="viewerBadge_link"],
     [class*="_profileContainer"], [class*="_container_"][class*="profile"] {
         display: none !important; visibility: hidden !important; height: 0 !important;
+    }
+    /* header FICA visível — é onde mora o botão de abrir a sidebar (setinha
+       »»). Só esvazia o visual (sem barra/sombra), não esconde o botão. */
+    header[data-testid="stHeader"] {
+        background: transparent !important; box-shadow: none !important;
+        height: auto !important; visibility: visible !important;
     }
     </style>
     """,
@@ -91,17 +98,22 @@ st.markdown(
 exigir_login_btsa()
 
 
-# Cache fica em data.repository (keyado pela janela 8h/15h BR); preparar() é
-# passthrough quando o snapshot já traz cupons calculados pelo Fabric.
-df = preparar(carregar_dados())
-resultado = validar(df)
-
+# Header/tema/splash ANTES da carga: o download do OneLake leva ~30s na 1ª
+# sessão da janela e, sem isso, o usuário via tela branca até terminar.
 page_header(
     "Campanha do Milhão",
     f"{CAMPANHA.empresa} · visão executiva da campanha",
     icon="fa-trophy",
     atualizado_em=ultima_atualizacao(),
 )
+
+# Cache fica em data.repository (keyado pela janela 8h/15h BR); preparar() é
+# passthrough quando o snapshot já traz cupons calculados pelo Fabric.
+df = preparar(carregar_dados())
+resultado = validar(df)
+# Paradigma do painel: elegibilidade/inadimplência contam por CONTRATO
+# (venda), não por cliente — uma venda pode ter vários compradores.
+df["_contrato_id"] = id_contrato(df)
 
 _mob = is_mobile()  # mobile usa tabelas HTML c/ 1a coluna fixa; desktop usa st.dataframe
 
@@ -112,10 +124,29 @@ if not resultado.ok:
 for aviso in resultado.avisos:
     st.warning(aviso)
 
+# Filtros de regional/cidade na sidebar. forcar_sidebar_aberta() (chamada em
+# page_header) clica o botão de expandir se o navegador lembrar estado
+# colapsado — sem isso o filtro fica inacessível pro usuário achar a setinha.
+# Independentes (sem cascata) pra evitar seleção presa quando o widget de
+# cidade herda opção que sumiu do regional escolhido. Vazio = todos.
+with st.sidebar:
+    st.markdown("### Filtros")
+    _regionais_opts = sorted(df["regional"].dropna().unique())
+    _cidades_opts = sorted(df["cidade"].dropna().unique())
+    _sel_regional = st.multiselect("Regional", _regionais_opts, default=[], key="filtro_regional")
+    _sel_cidade = st.multiselect("Cidade", _cidades_opts, default=[], key="filtro_cidade")
+
+_regional_ativo = _sel_regional or _regionais_opts
+_cidade_ativo = _sel_cidade or _cidades_opts
+df = df[df["regional"].isin(_regional_ativo) & df["cidade"].isin(_cidade_ativo)]
+if df.empty:
+    st.warning("Nenhum dado para os filtros selecionados.")
+    st.stop()
+
 m = kpis_carteira(df)
 prog = progresso_campanha()
-taxa_cadastro = (100 * m["clientes_cadastrados"] / m["clientes_participantes"]
-                 if m["clientes_participantes"] else 0)
+taxa_cadastro = (100 * m["contratos_cadastrados"] / m["contratos_participantes"]
+                 if m["contratos_participantes"] else 0)
 _cal = calendario_sorteios()
 sorteios_realizados = int((_cal["Status"] == "Realizado").sum())
 sorteios_total = len(_cal)
@@ -134,6 +165,7 @@ tabs = st.tabs([
     "Visão Geral",
     "Análise por Cidade",
     "Funil da Campanha",
+    "Inadimplência",
     "Matriz de Participação",
     "Indicadores Executivos",
     "Exportação",
@@ -201,82 +233,175 @@ with tabs[0]:
     ])
     # Adimplência × inadimplência consolidadas num único bloco (CONTEXT item 4).
     comparativo_carteira(
-        adimplentes=m["clientes_elegiveis"],
-        inadimplentes=m["inadimplentes"],
+        adimplentes=m["contratos_elegiveis"],
+        inadimplentes=m["contratos_inadimplentes"],
         valor_vencido=m["valor_vencido"],
+        clientes_unicos=m["clientes_participantes"],
     )
     progress_adimplencia(m["pct_adimplencia"], meta=70.0)
 
 # ── Tab 1 — Análise por Cidade ────────────────────────────────────────────────
 with tabs[1]:
     _n_cid = int(df["cidade"].nunique()) or 1
+    # Pivot por cidade calculado ANTES dos cards — alimenta o farol vs média e
+    # os cards de contagem acima/abaixo da média (pedido Robson 09/07).
+    _pivc = (df.groupby(["cidade", "status_elegibilidade"])["_contrato_id"]
+             .nunique().unstack(fill_value=0)
+             .reindex(columns=["elegivel", "pendente"], fill_value=0))
+    _contratos = (_pivc["elegivel"] + _pivc["pendente"]).astype(int)
+    # % de contratos adimplentes da cidade vs média geral da carteira filtrada.
+    _adim_cid = _pivc["elegivel"] / _contratos.clip(lower=1)
+    _media_geral = m["pct_adimplencia"] / 100
+    _acima = int((_adim_cid >= _media_geral).sum())
+    _abaixo = int((_adim_cid < _media_geral).sum())
     stat_cards([
         {"label": "Cidades participantes", "valor": numero(_n_cid),
          "icon": "fa-city", "cor": "blue",
          "tooltip": "Municípios distintos com ao menos um cliente ativo no portfólio."},
-        {"label": "Cupons do Milhão / cidade (média)", "valor": numero(round(m["cupons_calculados"] / _n_cid)),
-         "icon": "fa-ticket", "cor": "green",
-         "tooltip": "Média de cupons do sorteio do Milhão por município: total de cupons ÷ número de cidades participantes."},
-        {"label": "Elegíveis / cidade (média)", "valor": numero(round(m["clientes_elegiveis"] / _n_cid)),
+        {"label": "Cupons do Milhão (total)", "valor": numero(m["cupons_calculados"]),
+         "icon": "fa-ticket", "cor": "blue",
+         "tooltip": "Total de cupons do sorteio do Milhão gerados na campanha (1 cupom a cada R$ 100 pagos)."},
+        {"label": "Cupons elegíveis", "valor": numero(m["cupons_elegiveis"]),
          "icon": "fa-circle-check", "cor": "green",
-         "tooltip": "Média de clientes APTO por município: total de elegíveis ÷ número de cidades participantes."},
-        {"label": "Inadimplentes / cidade (média)", "valor": numero(round(m["inadimplentes"] / _n_cid)),
-         "icon": "fa-ban", "cor": "red",
-         "tooltip": "Média de clientes NÃO APTO por município: total de inadimplentes ÷ número de cidades participantes."},
+         "tooltip": "Cupons gerados por contratos APTO — só esses concorrem de fato aos sorteios."},
+        {"label": "Cidades acima da média", "valor": f"{numero(_acima)} ({100 * _acima / _n_cid:.0f}%)",
+         "icon": "fa-arrow-trend-up", "cor": "green",
+         "tooltip": f"Cidades com % de contratos adimplentes maior ou igual à média geral da carteira ({m['pct_adimplencia']:.1f}%)."},
+        {"label": "Cidades abaixo da média", "valor": f"{numero(_abaixo)} ({100 * _abaixo / _n_cid:.0f}%)",
+         "icon": "fa-arrow-trend-down", "cor": "red",
+         "tooltip": f"Cidades com % de contratos adimplentes menor que a média geral da carteira ({m['pct_adimplencia']:.1f}%). Prioridade de atuação da campanha."},
     ])
+    st.markdown(
+        """<style>
+        .st-key-viz_reg_wrap {
+            background: #FFFFFF; border-radius: 12px; padding: 10px 16px;
+            width: fit-content;
+        }
+        .st-key-viz_reg_wrap div[data-testid="stRadio"] {
+            display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+        }
+        .st-key-viz_reg_wrap [data-testid="stWidgetLabel"] {
+            margin-bottom: 0; display: flex; align-items: center;
+        }
+        .st-key-viz_reg_wrap [data-testid="stWidgetLabel"] p {
+            margin-bottom: 0; line-height: 1;
+        }
+        .st-key-viz_reg_wrap div[role="radiogroup"] {
+            align-items: center;
+        }
+        .st-key-viz_reg_wrap label[data-baseweb="radio"] {
+            align-items: center;
+        }
+        </style>""",
+        unsafe_allow_html=True,
+    )
+    with st.container(key="viz_reg_wrap"):
+        _viz_reg = st.radio(
+            "Visualização por regional", ["Absoluto", "% da capacidade"],
+            horizontal=True, key="viz_regional",
+            help="Absoluto soma os totais da regional. % da capacidade mostra quanto do "
+                 "potencial da regional já virou resultado (recebido ÷ (recebido + "
+                 "inadimplência)) — compara regionais de tamanhos diferentes de forma justa.",
+        )
+    _pct_capacidade = _viz_reg.startswith("%")
+    # Capacidade da regional = recebido + saldo inadimplente (tudo que poderia
+    # ter entrado). Base do "% gerado do possível" pedido na reunião de 09/07.
+    _cap_reg = df.groupby("regional").agg(
+        rec=("valor_total_recebido", "sum"),
+        inad=("valor_vencido_antes", "sum"),
+        cup=("cupons_calculados", "sum"),
+    )
+    _cap_reg["capacidade"] = (_cap_reg["rec"] + _cap_reg["inad"]).clip(lower=1)
+
     c1, c2 = st.columns(2)
     with c1:
-        por_reg_cup = (
-            df.groupby("regional", as_index=False)["cupons_calculados"]
-            .sum().sort_values("cupons_calculados", ascending=False)
+        if _pct_capacidade:
+            por_reg_cup = (
+                (100 * _cap_reg["cup"] / (_cap_reg["capacidade"] / 100))
+                .rename("cupons_calculados").reset_index()
+                .sort_values("cupons_calculados", ascending=False)
+            )
+        else:
+            por_reg_cup = (
+                df.groupby("regional", as_index=False)["cupons_calculados"]
+                .sum().sort_values("cupons_calculados", ascending=False)
+            )
+        # Totalizador no subtítulo: soma absoluta ou % geral ponderado.
+        _tot_cup_pct = 100 * _cap_reg["cup"].sum() / (_cap_reg["capacidade"].sum() / 100)
+        _tot_cup_txt = (
+            f"{_tot_cup_pct:.1f}%".replace(".", ",") + " da capacidade geral"
+            if _pct_capacidade else f"{numero(int(_cap_reg['cup'].sum()))} cupons"
         )
         barras_cidades(
             por_reg_cup, "regional", "cupons_calculados",
             "Engajamento por regional — cupons do Milhão",
-            "Performance: verde=alto · âmbar=médio · vermelho=baixo",
+            "Performance: verde=alto · âmbar=médio · vermelho=baixo" if not _pct_capacidade
+            else "% dos cupons possíveis já gerados — capacidade = (recebido + inadimplência) ÷ R$ 100",
+            rotulo_hover="% da capacidade" if _pct_capacidade else "Cupons",
+            is_percent=_pct_capacidade,
+            chip=f"Total: {_tot_cup_txt}", chip_icon="fa-ticket",
         )
     with c2:
-        por_reg_rec = (
-            df.groupby("regional", as_index=False)["valor_total_recebido"]
-            .sum().sort_values("valor_total_recebido", ascending=False)
+        if _pct_capacidade:
+            por_reg_rec = (
+                (100 * _cap_reg["rec"] / _cap_reg["capacidade"])
+                .rename("valor_total_recebido").reset_index()
+                .sort_values("valor_total_recebido", ascending=False)
+            )
+        else:
+            por_reg_rec = (
+                df.groupby("regional", as_index=False)["valor_total_recebido"]
+                .sum().sort_values("valor_total_recebido", ascending=False)
+            )
+        _tot_rec_pct = 100 * _cap_reg["rec"].sum() / _cap_reg["capacidade"].sum()
+        _tot_rec_txt = (
+            f"{_tot_rec_pct:.1f}%".replace(".", ",") + " da capacidade geral"
+            if _pct_capacidade else moeda(_cap_reg["rec"].sum())
         )
         barras_cidades(
             por_reg_rec, "regional", "valor_total_recebido",
             "Volume de recebimento por regional",
-            "Volume financeiro total arrecadado por regional",
-            is_monetary=True,
+            "Volume financeiro total arrecadado por regional" if not _pct_capacidade
+            else "% do potencial da carteira já arrecadado — recebido ÷ (recebido + inadimplência)",
+            is_monetary=not _pct_capacidade,
+            rotulo_hover="% da capacidade",
+            is_percent=_pct_capacidade,
+            chip=f"Total: {_tot_rec_txt}", chip_icon="fa-coins",
         )
     # Participação por cidade — valores numéricos crus p/ ordenação correta.
     # NumberColumn format="localized" segue o locale pt-BR do browser (1.234,56);
     # format="percent" recebe fração (0-1) e renderiza %.
-    _pivc = (df.groupby(["cidade", "status_elegibilidade"])["cpf_titular"]
-             .nunique().unstack(fill_value=0)
-             .reindex(columns=["elegivel", "pendente"], fill_value=0))
+    # (_pivc/_contratos/_adim_cid já calculados no topo da aba p/ os cards.)
     _totc = df.groupby("cidade").agg(cup=("cupons_calculados", "sum"),
-                                     val=("valor_total_recebido", "sum"))
-    _clientes = (_pivc["elegivel"] + _pivc["pendente"]).astype(int)
-    _tot_clientes = int(_clientes.sum()) or 1
+                                     val=("valor_total_recebido", "sum"),
+                                     inad=("valor_vencido_antes", "sum"))
+    _tot_contratos = int(_contratos.sum()) or 1
     _tot_cupons = float(_totc["cup"].reindex(_pivc.index).fillna(0).sum()) or 1.0
 
     resumo_cidade = pd.DataFrame({
         "Cidade": _pivc.index,
-        "Clientes": _clientes.values,
-        "Repres.": (_clientes / _tot_clientes).values,
+        # Farol vs média geral de adimplência (pedido Robson 09/07): cidade
+        # abaixo da média = vermelha, prioridade de atuação.
+        "Farol": ["🟢" if ok else "🔴" for ok in (_adim_cid >= _media_geral)],
+        "Contratos": _contratos.values,
+        "Repres.": (_contratos / _tot_contratos).values,
         "Elegíveis": _pivc["elegivel"].astype(int).values,
         "Pendentes": _pivc["pendente"].astype(int).values,
-        "% Inadimpl.": (_pivc["pendente"] / _clientes.clip(lower=1)).values,
+        "% Adimpl.": _adim_cid.values,
+        "% Inadimpl.": (_pivc["pendente"] / _contratos.clip(lower=1)).values,
+        "Saldo Inadimpl. (R$)": _totc["inad"].reindex(_pivc.index).fillna(0).values,
         "Cupons": _totc["cup"].reindex(_pivc.index).fillna(0).astype(int).values,
         "% Cupons": (_totc["cup"].reindex(_pivc.index).fillna(0) / _tot_cupons).values,
         "Valor (R$)": _totc["val"].reindex(_pivc.index).fillna(0).values,
-    }).sort_values("Clientes", ascending=False).reset_index(drop=True)
+    }).sort_values("Contratos", ascending=False).reset_index(drop=True)
 
     # Styler: formata a EXIBIÇÃO (R$/pt-BR/%) mas mantém as colunas numéricas
     # por baixo — assim a ordenação por clique continua numérica correta.
     _fmt_pct = lambda v: percentual(v * 100)
     _sty = resumo_cidade.style.format({
-        "Clientes": numero, "Elegíveis": numero, "Pendentes": numero, "Cupons": numero,
-        "Repres.": _fmt_pct, "% Inadimpl.": _fmt_pct, "% Cupons": _fmt_pct,
-        "Valor (R$)": moeda,
+        "Contratos": numero, "Elegíveis": numero, "Pendentes": numero, "Cupons": numero,
+        "Repres.": _fmt_pct, "% Adimpl.": _fmt_pct, "% Inadimpl.": _fmt_pct,
+        "% Cupons": _fmt_pct, "Saldo Inadimpl. (R$)": moeda, "Valor (R$)": moeda,
     })
 
     with card("Participação por cidade",
@@ -285,10 +410,11 @@ with tabs[1]:
             # Mobile: HTML com 1a coluna fixa (sticky). Formata os números aqui
             # já que a tabela HTML usa strings prontas.
             _disp_cid = resumo_cidade.copy()
-            for _c in ("Clientes", "Elegíveis", "Pendentes", "Cupons"):
+            for _c in ("Contratos", "Elegíveis", "Pendentes", "Cupons"):
                 _disp_cid[_c] = _disp_cid[_c].map(numero)
-            for _c in ("Repres.", "% Inadimpl.", "% Cupons"):
+            for _c in ("Repres.", "% Adimpl.", "% Inadimpl.", "% Cupons"):
                 _disp_cid[_c] = _disp_cid[_c].map(_fmt_pct)
+            _disp_cid["Saldo Inadimpl. (R$)"] = _disp_cid["Saldo Inadimpl. (R$)"].map(moeda)
             _disp_cid["Valor (R$)"] = _disp_cid["Valor (R$)"].map(moeda)
             tabela_html(_disp_cid)
         else:
@@ -300,45 +426,60 @@ with tabs[1]:
                 column_config={
                     "Cidade": st.column_config.TextColumn(
                         "Cidade", pinned=True, width="large"),
-                    "Clientes": st.column_config.NumberColumn(
-                        "Clientes", width="small",
-                        help="Total de clientes únicos (CPF) com venda ativa na cidade."),
+                    "Farol": st.column_config.TextColumn(
+                        "Farol", width="small",
+                        help=f"🟢 adimplência ≥ média geral ({m['pct_adimplencia']:.1f}%) · 🔴 abaixo da média (prioridade de atuação)."),
+                    "% Adimpl.": st.column_config.NumberColumn(
+                        "% Adimpl.", width="small",
+                        help="Adimplência da cidade: contratos APTO ÷ total de contratos da cidade."),
+                    "Contratos": st.column_config.NumberColumn(
+                        "Contratos", width="small",
+                        help="Total de contratos (vendas) ativos na cidade."),
                     "Repres.": st.column_config.NumberColumn(
                         "Repres.", width="small",
-                        help="Representatividade: participação da cidade no total de clientes do portfólio."),
+                        help="Representatividade: participação da cidade no total de contratos do portfólio."),
                     "Elegíveis": st.column_config.NumberColumn(
                         "Elegíveis", width="small",
-                        help="Clientes APTO na cidade — sem inadimplência, participam dos sorteios."),
+                        help="Contratos APTO na cidade — sem inadimplência, participam dos sorteios."),
                     "Pendentes": st.column_config.NumberColumn(
                         "Pendentes", width="small",
-                        help="Clientes NÃO APTO na cidade — com parcelas vencidas."),
+                        help="Contratos NÃO APTO na cidade — com parcelas vencidas."),
                     "% Inadimpl.": st.column_config.NumberColumn(
                         "% Inadimpl.", width="small",
-                        help="Inadimplência da cidade: pendentes ÷ total de clientes da cidade."),
+                        help="Inadimplência da cidade: pendentes ÷ total de contratos da cidade."),
+                    "Saldo Inadimpl. (R$)": st.column_config.NumberColumn(
+                        "Saldo Inadimpl. (R$)", width="small",
+                        help="Valor total vencido em aberto dos contratos da cidade."),
                     "Cupons": st.column_config.NumberColumn(
                         "Cupons", width="small",
-                        help="Cupons gerados pelos clientes da cidade (1 cupom por R$ 100 recebido)."),
+                        help="Cupons gerados pelos contratos da cidade (1 cupom por R$ 100 recebido)."),
                     "% Cupons": st.column_config.NumberColumn(
                         "% Cupons", width="small",
                         help="Efeito da cidade: participação no total de cupons gerados na campanha."),
                     "Valor (R$)": st.column_config.NumberColumn(
                         "Valor (R$)",
-                        help="Soma do valor total recebido pelos clientes da cidade."),
+                        help="Soma do valor total recebido pelos contratos da cidade."),
                 },
             )
 
 # ── Tab 2 — Funil da Campanha ─────────────────────────────────────────────────
 with tabs[2]:
+    # Card dividido contratos / participantes (pedido Robson 09/07): base do
+    # painel é o CONTRATO; o subtexto traz os clientes únicos (CPF) do recorte.
+    _cli_eleg = int(df.loc[df["status_elegibilidade"] == "elegivel", "cpf_titular"].nunique())
+    _cli_inad = int(df.loc[df["status_elegibilidade"] == "pendente", "cpf_titular"].nunique())
+    _t_part = lambda n: {"texto": f"{numero(n)} participantes",
+                         "tipo": "neutral", "icon": "fa-users"}
     stat_cards([
-        {"label": "Total participantes", "valor": numero(m["clientes_participantes"]),
-         "icon": "fa-users", "cor": "green",
-         "tooltip": "Total de clientes únicos (CPF) com venda ativa no portfólio, independente de elegibilidade."},
-        {"label": "Elegíveis p/ sorteio", "valor": numero(m["clientes_elegiveis"]),
-         "icon": "fa-circle-check", "cor": "green",
-         "tooltip": "Clientes com status APTO: sem inadimplência no mês de referência, participam automaticamente dos sorteios."},
-        {"label": "Inadimplentes", "valor": numero(m["inadimplentes"]),
-         "icon": "fa-ban", "cor": "red",
-         "tooltip": "Clientes com status NÃO APTO: possuem parcelas vencidas e não participam dos sorteios mensais."},
+        {"label": "Total de contratos", "valor": numero(m["contratos_participantes"]),
+         "icon": "fa-users", "cor": "green", "trend": _t_part(m["clientes_participantes"]),
+         "tooltip": "Total de contratos (vendas) ativos no portfólio, independente de elegibilidade. Abaixo: clientes únicos (CPF) — um cliente pode ter vários contratos."},
+        {"label": "Elegíveis p/ sorteio", "valor": numero(m["contratos_elegiveis"]),
+         "icon": "fa-circle-check", "cor": "green", "trend": _t_part(_cli_eleg),
+         "tooltip": "Contratos com status APTO: sem inadimplência no mês de referência, participam automaticamente dos sorteios. Abaixo: clientes únicos com contrato apto."},
+        {"label": "Inadimplentes", "valor": numero(m["contratos_inadimplentes"]),
+         "icon": "fa-ban", "cor": "red", "trend": _t_part(_cli_inad),
+         "tooltip": "Contratos com status NÃO APTO: possuem parcelas vencidas e não participam dos sorteios mensais. Abaixo: clientes únicos com contrato inadimplente."},
         {"label": "Cupons do Milhão", "valor": numero(m["cupons_calculados"]),
          "icon": "fa-ticket", "cor": "blue",
          "tooltip": "Cupons do sorteio final do Milhão. Gerado pelo Fabric: soma de cupons por venda. Regra: 1 cupom a cada R$100 de pagamento válido no mês de referência."},
@@ -360,19 +501,27 @@ with tabs[2]:
             )
             if _gran == "Diário":
                 linha_temporal(recebimento_diario(df), "data", "acumulado",
-                               skip_card=True)
+                               skip_card=True, altura=210)
             else:
                 _men = recebimento_mensal(df).copy()
                 _men["data"] = _men["data"].apply(mes_ano_pt)
                 barras(_men, "data", "valor_total_recebido", "",
-                       is_monetary=True, skip_card=True)
+                       is_monetary=True, skip_card=True, altura=210)
 
     c1, c2 = st.columns(2)
     with c1:
         _bloco_recebimento()
     with c2:
-        funil(funil_participacao(df), "clientes", "etapa", "Funil de participação",
-              "Do recebimento à elegibilidade")
+        funil(funil_participacao(df), "contratos", "etapa", "Funil de participação",
+              "Do recebimento à elegibilidade", altura=215,
+              descricoes={
+                  "Base total": "Todos os contratos (vendas) ativos da carteira, "
+                                "independente da situação de pagamento.",
+                  "Elegíveis": "Contratos APTO — sem parcela vencida no fechamento "
+                               "do período. Participam automaticamente dos sorteios.",
+                  "Geraram cupons": "Contratos elegíveis que já geraram ao menos 1 "
+                                    "cupom (R$ 100 pagos = 1 cupom).",
+              })
     c3, c4 = st.columns(2)
     with c3:
         _cupons_mes = cupons_por_mes(df).copy()
@@ -380,16 +529,133 @@ with tabs[2]:
         barras(_cupons_mes, "mes_referencia", "cupons_calculados",
                "Cupons do Milhão por mês (concorrem ao sorteio do mês)",
                "Mês atual destacado · acumulado concorre ao prêmio final de R$ 1 milhão",
-               destaque=mes_extenso_pt(mes_referencia_atual()))
+               destaque=mes_extenso_pt(mes_referencia_atual()), altura=285)
     with c4:
-        donut(recebimento_por_classificacao(df), "classificacao_recebimento",
-              "valor_total_recebido", "Origem do recebimento", "Normal vs recuperação",
-              cores={"normal": "#2a9d45", "recuperacao": "#f59e0b"})
+        # Padrão da empresa (Robson 09/07): Em dia = parcela do mês paga no mês;
+        # Recuperado = parcela de meses anteriores; Antecipado = mês futuro.
+        donut(recebimento_por_origem(df), "origem", "valor",
+              "Origem do recebimento", "Em dia · Recuperado · Antecipado",
+              cores={"Em dia": "#2a9d45", "Recuperado": "#f59e0b",
+                     "Antecipado": "#3b82f6"},
+              altura=290,
+              descricoes={
+                  "Em dia": "Parcela do mês vigente paga dentro do próprio mês "
+                            "(venceu dia 1º e pagou dia 31 = em dia).",
+                  "Recuperado": "Parcela paga DEPOIS do vencimento — cliente "
+                                "quitou parcela que já estava vencida.",
+                  "Antecipado": "Parcela com vencimento em mês futuro paga "
+                                "agora. Antecipar não quita parcela vencida anterior.",
+              })
 
-# ── Tab 3 — Matriz de Participação ────────────────────────────────────────────
+# ── Tab 3 — Inadimplência ────────────────────────────────────────────────────
 with tabs[3]:
+    # Página dedicada (pedido Robson 09/07): quebra do saldo em justiça ×
+    # cobrável, decomposição multa/juros e faixas de atraso. "Atraso do mês"
+    # depende de coluna nova na query (pendente no Fabric).
+    _v_inad  = m["valor_vencido"]
+    _v_juros = float(df["valor_juros_inadimplencia"].sum())
+    _v_multa = float(df["valor_multa_inadimplencia"].sum())
+    _jur_any = df["juridico_ativo"] | df["juridico_passivo"]
+    _ctr_jur_ativo   = int(df.loc[df["juridico_ativo"], "_contrato_id"].nunique())
+    _ctr_jur_passivo = int(df.loc[df["juridico_passivo"], "_contrato_id"].nunique())
+    _ctr_jur = int(df.loc[_jur_any, "_contrato_id"].nunique())
+    _v_jur   = float(df.loc[_jur_any, "valor_vencido_antes"].sum())
+    _v_cobravel = max(0.0, _v_inad - _v_jur)
+    _pct_jm = 100 * (_v_juros + _v_multa) / _v_inad if _v_inad else 0.0
+    stat_cards([
+        {"label": "Saldo inadimplente total", "valor": moeda(_v_inad),
+         "icon": "fa-triangle-exclamation", "cor": "red",
+         "tooltip": "Valor total vencido em aberto na carteira na data do snapshot (inclui contratos na justiça)."},
+        {"label": "Multa + juros no saldo", "valor": moeda(_v_juros + _v_multa),
+         "icon": "fa-percent", "cor": "amber",
+         "trend": {"texto": f"{_pct_jm:.0f}% do saldo", "tipo": "neutral", "icon": "fa-chart-pie"},
+         "tooltip": "Quanto do saldo inadimplente é multa e juros de atraso — referência de custo ao conceder desconto de multa/juros vs custo da campanha."},
+        {"label": "Na justiça", "valor": moeda(_v_jur),
+         "icon": "fa-scale-balanced", "cor": "red",
+         "trend": {"texto": f"{numero(_ctr_jur)} contratos", "tipo": "neutral", "icon": "fa-file-contract"},
+         "tooltip": "Saldo vencido de contratos com ocorrência jurídica aberta (ativo ou passivo). Fora do alcance da cobrança comum."},
+        {"label": "Jurídico ativo", "valor": numero(_ctr_jur_ativo),
+         "icon": "fa-gavel", "cor": "amber",
+         "tooltip": "Contratos com ocorrência jurídica ATIVA aberta (empresa aciona o cliente)."},
+        {"label": "Jurídico passivo", "valor": numero(_ctr_jur_passivo),
+         "icon": "fa-shield-halved", "cor": "amber",
+         "tooltip": "Contratos com ocorrência jurídica PASSIVA aberta (cliente aciona a empresa)."},
+        {"label": "Saldo cobrável (fora da justiça)", "valor": moeda(_v_cobravel),
+         "icon": "fa-bullseye", "cor": "green",
+         "tooltip": "Saldo inadimplente de contratos SEM ocorrência jurídica — onde a campanha consegue atuar."},
+    ])
+    ci1, ci2 = st.columns(2)
+    with ci1:
+        _comp = pd.DataFrame({
+            "componente": ["Principal", "Juros de atraso", "Multa"],
+            "valor": [max(0.0, _v_inad - _v_juros - _v_multa), _v_juros, _v_multa],
+        })
+        donut(_comp, "componente", "valor", "Composição do saldo inadimplente",
+              "Principal · Juros · Multa",
+              cores={"Principal": "#2a9d45", "Juros de atraso": "#f59e0b",
+                     "Multa": "#dc2626"},
+              rotulo_hover="Saldo", altura=240)
+    with ci2:
+        _fx = inadimplencia_por_faixa(df)
+        _tons = ["#1B5E20", "#2E7D32", "#388E3C", "#fbbf24", "#f59e0b"]
+        _cores_fx = [_tons[int(i * (len(_tons) - 1) / max(len(_fx) - 1, 1))]
+                     for i in range(len(_fx))]
+        _fx_vgv_prev = st.session_state.get("viz_inad_faixa") == "Valor"
+        with card("Inadimplência por faixa de atraso",
+                  "Valor em aberto por faixa de atraso" if _fx_vgv_prev
+                  else "Contratos não aptos segmentados por dias em atraso"):
+            _viz_fx = st.radio(
+                "Visualização da inadimplência", ["Quantidade", "Valor"],
+                horizontal=True, key="viz_inad_faixa", label_visibility="collapsed",
+            )
+            _fx_vgv = _viz_fx == "Valor"
+            barras(_fx, "faixa", "valor" if _fx_vgv else "contratos",
+                   skip_card=True, is_monetary=_fx_vgv, cor=_cores_fx, altura=200)
+    ci3, ci4 = st.columns(2)
+    with ci3:
+        # Rosca na justiça × fora (pedido 13/07) — alterna valor R$ e
+        # quantidade de contratos, mesmo padrão de toggle da faixa de atraso.
+        _jur_qtd_prev = st.session_state.get("viz_jur_donut") == "Quantidade"
+        with card("Saldo na justiça × cobrável",
+                  "Contratos inadimplentes com e sem ocorrência jurídica" if _jur_qtd_prev
+                  else "Saldo vencido dentro e fora da justiça"):
+            _viz_jur = st.radio(
+                "Visualização justiça", ["Valores", "Quantidade"],
+                horizontal=True, key="viz_jur_donut", label_visibility="collapsed",
+            )
+            _jur_qtd = _viz_jur == "Quantidade"
+            if _jur_qtd:
+                _pend = df["status_elegibilidade"] == "pendente"
+                _don_vals = [
+                    int(df.loc[_pend & _jur_any, "_contrato_id"].nunique()),
+                    int(df.loc[_pend & ~_jur_any, "_contrato_id"].nunique()),
+                ]
+            else:
+                _don_vals = [
+                    float(df.loc[_jur_any, "valor_vencido_antes"].sum()),
+                    float(df.loc[~_jur_any, "valor_vencido_antes"].sum()),
+                ]
+            donut(
+                pd.DataFrame({"grupo": ["Na justiça", "Fora da justiça"],
+                              "valor": _don_vals}),
+                "grupo", "valor", "",
+                skip_card=True, is_monetary=not _jur_qtd, altura=270,
+                rotulo_hover="Contratos" if _jur_qtd else "Saldo",
+                cores={"Na justiça": "#dc2626", "Fora da justiça": "#2a9d45"})
+    with ci4:
+        _jur_reg = (
+            df.loc[_jur_any].groupby("regional")["_contrato_id"].nunique()
+            .rename("contratos").reset_index()
+            .sort_values("contratos", ascending=False)
+        )
+        barras(_jur_reg, "regional", "contratos",
+               "Contratos na justiça por regional",
+               "Ocorrência jurídica aberta (ativo + passivo)", altura=285)
+
+# ── Tab 4 — Matriz de Participação ────────────────────────────────────────────
+with tabs[4]:
     # Pivot: status_elegibilidade vira 2 colunas (Elegíveis × Pendentes) por obra.
-    _piv = (df.groupby(["obra", "status_elegibilidade"])["cpf_titular"]
+    _piv = (df.groupby(["obra", "status_elegibilidade"])["_contrato_id"]
             .nunique().unstack(fill_value=0))
     _tot = df.groupby("obra").agg(cup=("cupons_calculados", "sum"),
                                   val=("valor_total_recebido", "sum"))
@@ -401,16 +667,18 @@ with tabs[3]:
         "Cupons": [numero(v) for v in _tot["cup"].reindex(_piv.index).fillna(0)],
         "Valor": [moeda(v) for v in _tot["val"].reindex(_piv.index).fillna(0)],
     })
+    # Cidade da obra no ranking, ordem cidade → obra → cliente (Robson 09/07).
     _tc = (
-        df.groupby(["nome_cliente", "obra", "status_elegibilidade"], as_index=False)
+        df.groupby(["nome_cliente", "obra", "cidade", "status_elegibilidade"], as_index=False)
         .agg(cupons=("cupons_calculados", "sum"), valor=("valor_total_recebido", "sum"))
         .sort_values("cupons", ascending=False)
         .head(15)
         .reset_index(drop=True)
     )
     top_clientes = pd.DataFrame({
-        "Cliente": _tc["nome_cliente"],
+        "Cidade": _tc["cidade"],
         "Obra": _tc["obra"],
+        "Cliente": _tc["nome_cliente"],
         "status_elegibilidade": _tc["status_elegibilidade"],  # nome cru p/ badge
         "Cupons": [numero(v) for v in _tc["cupons"]],
         "Valor": [moeda(v) for v in _tc["valor"]],
@@ -424,24 +692,24 @@ with tabs[3]:
         tabela(top_clientes, "Ranking de 15 clientes por cupons",
                "Clientes com maior volume de cupons do Milhão gerados", status=True, altura=580)
 
-# ── Tab 4 — Indicadores Executivos ───────────────────────────────────────────
-with tabs[4]:
+# ── Tab 5 — Indicadores Executivos ───────────────────────────────────────────
+with tabs[5]:
     stat_cards([
         {"label": "Ticket médio (por venda)", "valor": moeda(m["ticket_medio"]),
          "icon": "fa-file-invoice-dollar", "cor": "green",
          "tooltip": "Valor médio recebido por venda: total recebido ÷ número de vendas únicas ativas no período."},
-        {"label": "Cupons do Milhão / cliente apto", "valor": str(m["cupons_por_cliente_apto"]),
+        {"label": "Cupons do Milhão / contrato apto", "valor": str(m["cupons_por_contrato_apto"]),
          "icon": "fa-ticket", "cor": "blue",
-         "tooltip": "Média de cupons do sorteio do Milhão por cliente elegível: total de cupons ÷ total de clientes com status APTO."},
+         "tooltip": "Média de cupons do sorteio do Milhão por contrato elegível: total de cupons ÷ total de contratos com status APTO."},
         {"label": "Taxa de elegibilidade", "valor": f"{taxa_cadastro:.1f}%",
          "icon": "fa-user-check", "cor": "amber",
-         "tooltip": "% de clientes com status APTO sobre o total de participantes únicos (CPF) do portfólio."},
+         "tooltip": "% de contratos com status APTO sobre o total de contratos ativos do portfólio."},
         {"label": "Novos clientes (campanha)", "valor": numero(novos_clientes(df)),
          "icon": "fa-user-plus", "cor": "blue",
          "tooltip": "Clientes cuja PRIMEIRA venda ocorreu a partir de 01/07/2026 (início da campanha). Cliente antigo que comprou de novo não conta."},
-        {"label": "Clientes recuperados", "valor": numero(m["clientes_recuperados"]),
+        {"label": "Contratos recuperados", "valor": numero(m["contratos_recuperados"]),
          "icon": "fa-user-check", "cor": "green",
-         "tooltip": "Clientes que estavam inadimplentes no fechamento de junho e regularizaram no período (flag Recuperação da base). É a conversão da campanha."},
+         "tooltip": "Contratos que estavam inadimplentes no fechamento de junho e regularizaram no período (flag Recuperação da base). É a conversão da campanha."},
         {"label": "Valor recuperado", "valor": moeda(m["valor_recuperado"]),
          "icon": "fa-rotate-right", "cor": "green",
          "tooltip": "Pagamentos de clientes que estavam inadimplentes no fechamento de junho e regularizaram no período (flag Recuperação da base)."},
@@ -465,55 +733,70 @@ with tabs[4]:
                     "conforme a carteira é paga."
                 ))
     with c2:
-        _fx = inadimplencia_por_faixa(df)
-        # Mesma paleta do gráfico por regional: verde escuro → amarelo conforme
-        # a faixa de atraso aumenta (posição, não valor).
-        _tons = ["#1B5E20", "#2E7D32", "#388E3C", "#fbbf24", "#f59e0b"]
-        _cores_fx = [_tons[int(i * (len(_tons) - 1) / max(len(_fx) - 1, 1))]
-                     for i in range(len(_fx))]
-        # altura maior p/ preencher o card na mesma linha do medidor.
-        barras(_fx, "faixa", "clientes",
-               "Inadimplência por faixa de atraso",
-               "Clientes não aptos segmentados por dias em atraso",
-               cor=_cores_fx, altura=270)
-
-    c3, c4 = st.columns([1, 1])
-    with c3:
+        # Faixa de atraso migrou pra aba Inadimplência (página dedicada).
         barras(cupons_media_dia_semana(df), "dia", "cupons",
                "Média de cupons do Milhão por dia da semana",
                "Cupons do Milhão gerados em média em cada dia da semana (por data de recebimento)",
-               altura=240)
+               altura=270)
+
+    c3, c4 = st.columns([1, 1])
+    with c3:
+        # Linha temporal acumulada com botões Novos × Recuperados (pedido 13/07).
+        @st.fragment
+        def _bloco_clientes():
+            # Fragment isola o rerun do toggle — não reseta as st.tabs.
+            with card("Evolução de clientes na campanha",
+                      "Acumulado por dia — Novos: 1ª venda na campanha · "
+                      "Recuperados: dia em que o inadimplente regularizou"):
+                _viz_cli = st.radio(
+                    "Série de clientes", ["Novos clientes", "Clientes recuperados"],
+                    horizontal=True, key="viz_cli_serie", label_visibility="collapsed",
+                )
+                _serie = clientes_serie_diaria(
+                    df, "novos" if _viz_cli.startswith("Novos") else "recuperados"
+                )
+                linha_temporal(_serie, "data", "acumulado", skip_card=True,
+                               is_monetary=False, col_diaria="quantidade")
+        _bloco_clientes()
     with c4:
         barras(cupons_por_tipo(df), "tipo", "cupons",
                "Cupons por sorteio",
                "Milhão (acumula até o final) × Casas (concorrem no mês)",
-               altura=240)
+               altura=270)
 
-# ── Tab 5 — Exportação ───────────────────────────────────────────────────────
-with tabs[5]:
+# ── Tab 6 — Exportação ───────────────────────────────────────────────────────
+with tabs[6]:
     _df_exp = df.copy()
     if "empresa_codigo" not in _df_exp.columns:
         _df_exp["empresa_codigo"] = _df_exp["codempresa"].astype(str)
+    # Elegíveis/inadimplentes contam CONTRATOS únicos (paradigma do painel):
+    # unstack por status evita contar a mesma venda 2x quando há >1 comprador.
+    _grp_cols = ["regional", "cidade", "empresa_codigo", "obra_nome"]
+    _piv_mat = (
+        _df_exp.groupby(_grp_cols + ["status_elegibilidade"])["_contrato_id"]
+        .nunique().unstack(fill_value=0)
+        .reindex(columns=["elegivel", "pendente"], fill_value=0)
+    )
     _mat = (
-        _df_exp.groupby(["regional", "cidade", "empresa_codigo", "obra_nome"], as_index=False)
+        _df_exp.groupby(_grp_cols, as_index=False)
         .agg(
             empresa_nome=("empresa", "first"),
-            clientes=("cpf_titular", "nunique"),
-            elegiveis=("status_elegibilidade", lambda s: (s == "elegivel").sum()),
-            inadimplentes=("status_elegibilidade", lambda s: (s == "pendente").sum()),
+            contratos=("_contrato_id", "nunique"),
             cupons=("cupons_calculados", "sum"),
             recebido=("valor_total_recebido", "sum"),
         )
+        .merge(_piv_mat.reset_index().rename(columns={"elegivel": "elegiveis", "pendente": "inadimplentes"}),
+               on=_grp_cols, how="left")
         .sort_values(["regional", "cidade", "empresa_codigo", "obra_nome"])
         .reset_index(drop=True)
     )
 
     _csv_mat = _mat[[
         "regional", "cidade", "empresa_codigo", "empresa_nome", "obra_nome",
-        "clientes", "elegiveis", "inadimplentes", "cupons", "recebido",
+        "contratos", "elegiveis", "inadimplentes", "cupons", "recebido",
     ]].rename(columns={
         "regional": "Regional", "cidade": "Cidade", "empresa_codigo": "Cód. Empresa",
-        "empresa_nome": "Empresa", "obra_nome": "Produto", "clientes": "Clientes",
+        "empresa_nome": "Empresa", "obra_nome": "Produto", "contratos": "Contratos",
         "elegiveis": "Elegíveis", "inadimplentes": "Inadimplentes",
         "cupons": "Cupons", "recebido": "Recebido (R$)",
     })
@@ -527,7 +810,7 @@ with tabs[5]:
     # é &#9654; (HTML entity p/ não quebrar no cp1252) e gira via CSS no [open].
     def _cells(s):
         return (
-            f'<span class="c">{_num(s.clientes)}</span>'
+            f'<span class="c">{_num(s.contratos)}</span>'
             f'<span class="c">{_num(s.elegiveis)}</span>'
             f'<span class="c">{_num(s.inadimplentes)}</span>'
             f'<span class="c">{_num(s.cupons)}</span>'
@@ -536,15 +819,15 @@ with tabs[5]:
 
     _rows = ""
     for _reg, _g1 in _mat.groupby("regional"):
-        _r = _g1[["clientes","elegiveis","inadimplentes","cupons","recebido"]].sum()
+        _r = _g1[["contratos","elegiveis","inadimplentes","cupons","recebido"]].sum()
         _rows += (f'<details class="lv0"><summary>'
                   f'<span class="nm"><span class="arr">&#9654;</span> <b>{_reg}</b></span>{_cells(_r)}</summary>')
         for _cid, _g2 in _g1.groupby("cidade"):
-            _c = _g2[["clientes","elegiveis","inadimplentes","cupons","recebido"]].sum()
+            _c = _g2[["contratos","elegiveis","inadimplentes","cupons","recebido"]].sum()
             _rows += (f'<details class="lv1"><summary>'
                       f'<span class="nm i1"><span class="arr">&#9654;</span> {_cid}</span>{_cells(_c)}</summary>')
             for _emp, _g3 in _g2.groupby("empresa_codigo"):
-                _e = _g3[["clientes","elegiveis","inadimplentes","cupons","recebido"]].sum()
+                _e = _g3[["contratos","elegiveis","inadimplentes","cupons","recebido"]].sum()
                 # Snapshot novo traz nomeempresa; no antigo "empresa" é a
                 # constante "Brasil Terrenos" p/ todas → cai no código.
                 _emp_nome = str(_g3["empresa_nome"].iloc[0])
@@ -642,7 +925,7 @@ with tabs[5]:
 <div class="hx"><div class="hx-scroll">
   <div class="hx-head">
     <span class="nm">Regional / Cidade / Empresa / Produto</span>
-    <span class="c">Clientes</span><span class="c">Elegíveis</span>
+    <span class="c">Contratos</span><span class="c">Elegíveis</span>
     <span class="c">Inadimpl.</span><span class="c">Cupons</span><span class="c">Recebido (R$)</span>
   </div>
   {_rows}
@@ -653,7 +936,7 @@ with tabs[5]:
 st.markdown(
     """
     <div style="text-align:center;color:#9499a3;font-size:12px;
-                padding:18px 0 8px;margin-top:24px;
+                padding:8px 0 2px;margin-top:6px;
                 border-top:1px solid #e8e9ec;">
       Painel desenvolvido pelo núcleo de dados Brasil Terrenos
     </div>

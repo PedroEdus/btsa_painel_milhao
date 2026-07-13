@@ -8,6 +8,10 @@ Formato 07/2026 (query nova): nomes com espaço/acento normalizados pelo
 pipeline p/ snake_case sem acento; valores monetários numéricos (antes
 "R$1.234,56" string); datas datetime; cupons pré-calculados em cupons_milhao
 sobre valor_gera_cupom (floor(valor/100), conferido 100% na carga 06/07).
+
+Formato 10/07/2026 (+7 colunas): Valor Recuperado, Antecipação,
+Valor Antecipado, Valor Juros/Multa Inadimplência, Jurídico Ativo/Passivo.
+Todas opcionais — bases antigas caem nos fallbacks (0.0/False/derivado).
 """
 
 from __future__ import annotations
@@ -152,8 +156,12 @@ def adaptar(df: pd.DataFrame) -> pd.DataFrame:
     else:
         _recup = pd.Series(False, index=df.index)
     df["classificacao_recebimento"] = _recup.map({True: "recuperacao", False: "normal"})
-    # Valor recuperado = o que os recuperados pagaram no período.
-    df["valor_recuperado"] = df["valor_total_recebido"].where(_recup, 0.0)
+    # Valor recuperado: coluna real da query 10/07 (soma dos pagamentos após o
+    # vencimento); fallback antigo = total recebido dos recuperados.
+    if "valor_recuperado" in df.columns:
+        df["valor_recuperado"] = _parse_brl(df["valor_recuperado"])
+    else:
+        df["valor_recuperado"] = df["valor_total_recebido"].where(_recup, 0.0)
     # Foto da inadimplência no fechamento de junho (início da campanha).
     if "inad_junho" in df.columns:
         _inad_jun = pd.to_numeric(df["inad_junho"], errors="coerce").fillna(0) > 0
@@ -162,7 +170,27 @@ def adaptar(df: pd.DataFrame) -> pd.DataFrame:
         )
     df["flag_vencido"]                = ~_apto
     df["participa_proximos_sorteios"] = _apto
-    df["flag_antecipacao"]            = False
+    # Antecipação (query 10/07): pagou parcela com vencimento em mês futuro.
+    if "antecipacao" in df.columns:
+        df["flag_antecipacao"] = (
+            df["antecipacao"].astype(str).str.strip().str.upper().str.startswith("S")
+        )
+    else:
+        df["flag_antecipacao"] = False
+    df["valor_antecipado"] = (
+        _parse_brl(df["valor_antecipado"])
+        if "valor_antecipado" in df.columns
+        else 0.0
+    )
+    # Decomposição do saldo de inadimplência em juros/multa (query 10/07).
+    for _col in ("valor_juros_inadimplencia", "valor_multa_inadimplencia"):
+        df[_col] = _parse_brl(df[_col]) if _col in df.columns else 0.0
+    # Ocorrência jurídica vinculada à venda ('Sim'/'Não' → bool).
+    for _col in ("juridico_ativo", "juridico_passivo"):
+        if _col in df.columns:
+            df[_col] = df[_col].astype(str).str.strip().str.upper().str.startswith("S")
+        else:
+            df[_col] = False
     df["flag_negociacao"]             = False
     df["titular_principal"]           = True
     df["qtd_compradores"]             = 1

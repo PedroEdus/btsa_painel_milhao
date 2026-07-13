@@ -114,27 +114,31 @@ input, textarea, h1, h2, h3, .stMarkdown p {{
   transition: color .45s ease, border-color .45s ease; }}
 /* superfícies grandes NUNCA transicionam bg (mata o flash branco na navegação) */
 .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"],
-[data-testid="stSidebar"], section.main {{ transition:none !important; }}
+section.main {{ transition:none !important; }}
+/* Sidebar: sem transição de cor (evita flash), mas com largura/posição
+   animadas — abrir/fechar o filtro fica suave em vez de "piscar". */
+[data-testid="stSidebar"] {{
+  transition: width .28s cubic-bezier(.4,0,.2,1),
+              min-width .28s cubic-bezier(.4,0,.2,1),
+              transform .28s cubic-bezier(.4,0,.2,1) !important; }}
 
 /* Chrome do Streamlit: esconde menu/deploy/toolbar/footer/status (CONTEXT item 3).
    display:none (não só visibility) p/ não reservar espaço na publicação. */
-#MainMenu, footer, header[data-testid="stHeader"],
+#MainMenu, footer,
 [data-testid="stMainMenuButton"], [data-testid="stAppDeployButton"],
-[data-testid="stToolbar"], [data-testid="stToolbarActions"],
+[data-testid="stToolbarActions"],
 [data-testid="stDecoration"], [data-testid="stStatusWidget"],
 .viewerBadge_container__1QSob, .viewerBadge_link__1S137,
 .viewerBadge_text__1JaDK, [class*="viewerBadge_container"],
 [class*="viewerBadge_link"] {{
   display:none !important; visibility:hidden !important; height:0 !important; }}
-/* Sidebar completamente removida — sem widget oculto, display:none é seguro. */
-[data-testid="stSidebar"],
-[data-testid="stExpandSidebarButton"],
-[data-testid="stSidebarCollapseButton"],
-[data-testid="stBaseButton-headerNoPadding"] {{ display: none !important; }}
-/* Usa 100% da largura sem a margem da sidebar */
-[data-testid="stAppViewContainer"] {{ margin-left: 0 !important; }}
-.block-container {{ padding: 0.1rem 2rem 2rem !important; max-width: 100% !important; width: 100% !important; }}
-[data-testid="stAppViewContainer"] {{ padding-left: 0 !important; }}
+/* header FICA visível — só ele carrega o botão nativo de abrir a sidebar
+   (setinha »»). Esvazia o visual (sem barra/sombra) em vez de escondê-lo. */
+header[data-testid="stHeader"] {{
+  background: transparent !important; box-shadow: none !important;
+  height: auto !important; visibility: visible !important; }}
+/* Sidebar visível — filtros de regional/cidade (CONTEXT filtros). */
+.block-container {{ padding: 0.1rem 2rem 0.4rem !important; max-width: 100% !important; }}
 
 /* Blocos utilitários (iframes de script via components.html + <style> injetado)
    saem do fluxo com position:absolute → não geram slot de gap no topo da página
