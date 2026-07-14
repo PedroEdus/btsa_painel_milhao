@@ -295,79 +295,84 @@ with tabs[1]:
         </style>""",
         unsafe_allow_html=True,
     )
-    with st.container(key="viz_reg_wrap"):
-        _viz_reg = st.radio(
-            "Visualização por regional", ["Absoluto", "% da capacidade"],
-            horizontal=True, key="viz_regional",
-            help="Absoluto soma os totais da regional. % da capacidade mostra quanto do "
-                 "potencial da regional já virou resultado (recebido ÷ (recebido + "
-                 "inadimplência)) — compara regionais de tamanhos diferentes de forma justa.",
+    @st.fragment
+    def _bloco_regionais():
+        # Fragment isola o rerun do toggle Absoluto/% da capacidade — só este
+        # bloco reroda no clique, sem recarregar as 7 abas inteiras.
+        with st.container(key="viz_reg_wrap"):
+            _viz_reg = st.radio(
+                "Visualização por regional", ["Absoluto", "% da capacidade"],
+                horizontal=True, key="viz_regional",
+                help="Absoluto soma os totais da regional. % da capacidade mostra quanto do "
+                     "potencial da regional já virou resultado (recebido ÷ (recebido + "
+                     "inadimplência)) — compara regionais de tamanhos diferentes de forma justa.",
+            )
+        _pct_capacidade = _viz_reg.startswith("%")
+        # Capacidade da regional = recebido + saldo inadimplente (tudo que poderia
+        # ter entrado). Base do "% gerado do possível" pedido na reunião de 09/07.
+        _cap_reg = df.groupby("regional").agg(
+            rec=("valor_total_recebido", "sum"),
+            inad=("valor_vencido_antes", "sum"),
+            cup=("cupons_calculados", "sum"),
         )
-    _pct_capacidade = _viz_reg.startswith("%")
-    # Capacidade da regional = recebido + saldo inadimplente (tudo que poderia
-    # ter entrado). Base do "% gerado do possível" pedido na reunião de 09/07.
-    _cap_reg = df.groupby("regional").agg(
-        rec=("valor_total_recebido", "sum"),
-        inad=("valor_vencido_antes", "sum"),
-        cup=("cupons_calculados", "sum"),
-    )
-    _cap_reg["capacidade"] = (_cap_reg["rec"] + _cap_reg["inad"]).clip(lower=1)
+        _cap_reg["capacidade"] = (_cap_reg["rec"] + _cap_reg["inad"]).clip(lower=1)
 
-    c1, c2 = st.columns(2)
-    with c1:
-        if _pct_capacidade:
-            por_reg_cup = (
-                (100 * _cap_reg["cup"] / (_cap_reg["capacidade"] / 100))
-                .rename("cupons_calculados").reset_index()
-                .sort_values("cupons_calculados", ascending=False)
+        c1, c2 = st.columns(2)
+        with c1:
+            if _pct_capacidade:
+                por_reg_cup = (
+                    (100 * _cap_reg["cup"] / (_cap_reg["capacidade"] / 100))
+                    .rename("cupons_calculados").reset_index()
+                    .sort_values("cupons_calculados", ascending=False)
+                )
+            else:
+                por_reg_cup = (
+                    df.groupby("regional", as_index=False)["cupons_calculados"]
+                    .sum().sort_values("cupons_calculados", ascending=False)
+                )
+            # Totalizador no subtítulo: soma absoluta ou % geral ponderado.
+            _tot_cup_pct = 100 * _cap_reg["cup"].sum() / (_cap_reg["capacidade"].sum() / 100)
+            _tot_cup_txt = (
+                f"{_tot_cup_pct:.1f}%".replace(".", ",") + " da capacidade geral"
+                if _pct_capacidade else f"{numero(int(_cap_reg['cup'].sum()))} cupons"
             )
-        else:
-            por_reg_cup = (
-                df.groupby("regional", as_index=False)["cupons_calculados"]
-                .sum().sort_values("cupons_calculados", ascending=False)
+            barras_cidades(
+                por_reg_cup, "regional", "cupons_calculados",
+                "Engajamento por regional — cupons do Milhão",
+                "Performance: verde=alto · âmbar=médio · vermelho=baixo" if not _pct_capacidade
+                else "% dos cupons possíveis já gerados — capacidade = (recebido + inadimplência) ÷ R$ 100",
+                rotulo_hover="% da capacidade" if _pct_capacidade else "Cupons",
+                is_percent=_pct_capacidade,
+                chip=f"Total: {_tot_cup_txt}", chip_icon="fa-ticket",
             )
-        # Totalizador no subtítulo: soma absoluta ou % geral ponderado.
-        _tot_cup_pct = 100 * _cap_reg["cup"].sum() / (_cap_reg["capacidade"].sum() / 100)
-        _tot_cup_txt = (
-            f"{_tot_cup_pct:.1f}%".replace(".", ",") + " da capacidade geral"
-            if _pct_capacidade else f"{numero(int(_cap_reg['cup'].sum()))} cupons"
-        )
-        barras_cidades(
-            por_reg_cup, "regional", "cupons_calculados",
-            "Engajamento por regional — cupons do Milhão",
-            "Performance: verde=alto · âmbar=médio · vermelho=baixo" if not _pct_capacidade
-            else "% dos cupons possíveis já gerados — capacidade = (recebido + inadimplência) ÷ R$ 100",
-            rotulo_hover="% da capacidade" if _pct_capacidade else "Cupons",
-            is_percent=_pct_capacidade,
-            chip=f"Total: {_tot_cup_txt}", chip_icon="fa-ticket",
-        )
-    with c2:
-        if _pct_capacidade:
-            por_reg_rec = (
-                (100 * _cap_reg["rec"] / _cap_reg["capacidade"])
-                .rename("valor_total_recebido").reset_index()
-                .sort_values("valor_total_recebido", ascending=False)
+        with c2:
+            if _pct_capacidade:
+                por_reg_rec = (
+                    (100 * _cap_reg["rec"] / _cap_reg["capacidade"])
+                    .rename("valor_total_recebido").reset_index()
+                    .sort_values("valor_total_recebido", ascending=False)
+                )
+            else:
+                por_reg_rec = (
+                    df.groupby("regional", as_index=False)["valor_total_recebido"]
+                    .sum().sort_values("valor_total_recebido", ascending=False)
+                )
+            _tot_rec_pct = 100 * _cap_reg["rec"].sum() / _cap_reg["capacidade"].sum()
+            _tot_rec_txt = (
+                f"{_tot_rec_pct:.1f}%".replace(".", ",") + " da capacidade geral"
+                if _pct_capacidade else moeda(_cap_reg["rec"].sum())
             )
-        else:
-            por_reg_rec = (
-                df.groupby("regional", as_index=False)["valor_total_recebido"]
-                .sum().sort_values("valor_total_recebido", ascending=False)
+            barras_cidades(
+                por_reg_rec, "regional", "valor_total_recebido",
+                "Volume de recebimento por regional",
+                "Volume financeiro total arrecadado por regional" if not _pct_capacidade
+                else "% do potencial da carteira já arrecadado — recebido ÷ (recebido + inadimplência)",
+                is_monetary=not _pct_capacidade,
+                rotulo_hover="% da capacidade",
+                is_percent=_pct_capacidade,
+                chip=f"Total: {_tot_rec_txt}", chip_icon="fa-coins",
             )
-        _tot_rec_pct = 100 * _cap_reg["rec"].sum() / _cap_reg["capacidade"].sum()
-        _tot_rec_txt = (
-            f"{_tot_rec_pct:.1f}%".replace(".", ",") + " da capacidade geral"
-            if _pct_capacidade else moeda(_cap_reg["rec"].sum())
-        )
-        barras_cidades(
-            por_reg_rec, "regional", "valor_total_recebido",
-            "Volume de recebimento por regional",
-            "Volume financeiro total arrecadado por regional" if not _pct_capacidade
-            else "% do potencial da carteira já arrecadado — recebido ÷ (recebido + inadimplência)",
-            is_monetary=not _pct_capacidade,
-            rotulo_hover="% da capacidade",
-            is_percent=_pct_capacidade,
-            chip=f"Total: {_tot_rec_txt}", chip_icon="fa-coins",
-        )
+    _bloco_regionais()
     # Participação por cidade — valores numéricos crus p/ ordenação correta.
     # NumberColumn format="localized" segue o locale pt-BR do browser (1.234,56);
     # format="percent" recebe fração (0-1) e renderiza %.
@@ -600,48 +605,57 @@ with tabs[3]:
         _tons = ["#1B5E20", "#2E7D32", "#388E3C", "#fbbf24", "#f59e0b"]
         _cores_fx = [_tons[int(i * (len(_tons) - 1) / max(len(_fx) - 1, 1))]
                      for i in range(len(_fx))]
-        _fx_vgv_prev = st.session_state.get("viz_inad_faixa") == "Valor"
-        with card("Inadimplência por faixa de atraso",
-                  "Valor em aberto por faixa de atraso" if _fx_vgv_prev
-                  else "Contratos não aptos segmentados por dias em atraso"):
-            _viz_fx = st.radio(
-                "Visualização da inadimplência", ["Quantidade", "Valor"],
-                horizontal=True, key="viz_inad_faixa", label_visibility="collapsed",
-            )
-            _fx_vgv = _viz_fx == "Valor"
-            barras(_fx, "faixa", "valor" if _fx_vgv else "contratos",
-                   skip_card=True, is_monetary=_fx_vgv, cor=_cores_fx, altura=200)
+
+        @st.fragment
+        def _bloco_faixa_atraso():
+            # Fragment isola o rerun do toggle Quantidade/Valor.
+            _fx_vgv_prev = st.session_state.get("viz_inad_faixa") == "Valor"
+            with card("Inadimplência por faixa de atraso",
+                      "Valor em aberto por faixa de atraso" if _fx_vgv_prev
+                      else "Contratos não aptos segmentados por dias em atraso"):
+                _viz_fx = st.radio(
+                    "Visualização da inadimplência", ["Quantidade", "Valor"],
+                    horizontal=True, key="viz_inad_faixa", label_visibility="collapsed",
+                )
+                _fx_vgv = _viz_fx == "Valor"
+                barras(_fx, "faixa", "valor" if _fx_vgv else "contratos",
+                       skip_card=True, is_monetary=_fx_vgv, cor=_cores_fx, altura=200)
+        _bloco_faixa_atraso()
     ci3, ci4 = st.columns(2)
     with ci3:
         # Rosca na justiça × fora (pedido 13/07) — alterna valor R$ e
         # quantidade de contratos, mesmo padrão de toggle da faixa de atraso.
-        _jur_qtd_prev = st.session_state.get("viz_jur_donut") == "Quantidade"
-        with card("Saldo na justiça × cobrável",
-                  "Contratos inadimplentes com e sem ocorrência jurídica" if _jur_qtd_prev
-                  else "Saldo vencido dentro e fora da justiça"):
-            _viz_jur = st.radio(
-                "Visualização justiça", ["Valores", "Quantidade"],
-                horizontal=True, key="viz_jur_donut", label_visibility="collapsed",
-            )
-            _jur_qtd = _viz_jur == "Quantidade"
-            if _jur_qtd:
-                _pend = df["status_elegibilidade"] == "pendente"
-                _don_vals = [
-                    int(df.loc[_pend & _jur_any, "_contrato_id"].nunique()),
-                    int(df.loc[_pend & ~_jur_any, "_contrato_id"].nunique()),
-                ]
-            else:
-                _don_vals = [
-                    float(df.loc[_jur_any, "valor_vencido_antes"].sum()),
-                    float(df.loc[~_jur_any, "valor_vencido_antes"].sum()),
-                ]
-            donut(
-                pd.DataFrame({"grupo": ["Na justiça", "Fora da justiça"],
-                              "valor": _don_vals}),
-                "grupo", "valor", "",
-                skip_card=True, is_monetary=not _jur_qtd, altura=270,
-                rotulo_hover="Contratos" if _jur_qtd else "Saldo",
-                cores={"Na justiça": "#dc2626", "Fora da justiça": "#2a9d45"})
+        @st.fragment
+        def _bloco_juridico():
+            # Fragment isola o rerun do toggle Valores/Quantidade.
+            _jur_qtd_prev = st.session_state.get("viz_jur_donut") == "Quantidade"
+            with card("Saldo na justiça × cobrável",
+                      "Contratos inadimplentes com e sem ocorrência jurídica" if _jur_qtd_prev
+                      else "Saldo vencido dentro e fora da justiça"):
+                _viz_jur = st.radio(
+                    "Visualização justiça", ["Valores", "Quantidade"],
+                    horizontal=True, key="viz_jur_donut", label_visibility="collapsed",
+                )
+                _jur_qtd = _viz_jur == "Quantidade"
+                if _jur_qtd:
+                    _pend = df["status_elegibilidade"] == "pendente"
+                    _don_vals = [
+                        int(df.loc[_pend & _jur_any, "_contrato_id"].nunique()),
+                        int(df.loc[_pend & ~_jur_any, "_contrato_id"].nunique()),
+                    ]
+                else:
+                    _don_vals = [
+                        float(df.loc[_jur_any, "valor_vencido_antes"].sum()),
+                        float(df.loc[~_jur_any, "valor_vencido_antes"].sum()),
+                    ]
+                donut(
+                    pd.DataFrame({"grupo": ["Na justiça", "Fora da justiça"],
+                                  "valor": _don_vals}),
+                    "grupo", "valor", "",
+                    skip_card=True, is_monetary=not _jur_qtd, altura=270,
+                    rotulo_hover="Contratos" if _jur_qtd else "Saldo",
+                    cores={"Na justiça": "#dc2626", "Fora da justiça": "#2a9d45"})
+        _bloco_juridico()
     with ci4:
         _jur_reg = (
             df.loc[_jur_any].groupby("regional")["_contrato_id"].nunique()

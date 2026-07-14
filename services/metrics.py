@@ -27,7 +27,13 @@ def id_contrato(df: pd.DataFrame) -> pd.Series:
     contam por CONTRATO, não por cliente — uma venda pode ter vários
     compradores (qtd_compradores) que não devem inflar a contagem.
     """
-    return df[list(CHAVE_VENDA)].astype(str).agg("|".join, axis=1)
+    # Concatenação vetorizada: agg("|".join, axis=1) faz apply linha a linha
+    # (Python puro) e domina o tempo de cada rerun em bases grandes.
+    cols = list(CHAVE_VENDA)
+    serie = df[cols[0]].astype(str)
+    for col in cols[1:]:
+        serie = serie + "|" + df[col].astype(str)
+    return serie
 
 
 def adicionar_valor_elegivel(df: pd.DataFrame, regra=REGRA_CUPOM) -> pd.DataFrame:
