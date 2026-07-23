@@ -74,6 +74,16 @@ def adaptar(df: pd.DataFrame) -> pd.DataFrame:
         "motivo":                  "motivo_bloqueio",
     })
 
+    # ── Registros de teste ───────────────────────────────────────────────────
+    # Vendas internas de teste têm a própria holding como cliente (valores
+    # simbólicos de R$ 10–100). São as únicas vendas de cidades como Pelotas,
+    # São Leopoldo e Marechal Deodoro, que sumiriam do painel sem elas.
+    _teste = (
+        df["nome_cliente"].astype(str).str.upper()
+        .str.contains("BRASIL TERRENOS", na=False)
+    )
+    df = df[~_teste].copy()
+
     # ── Valores monetários (string BRL ou numérico → float) ──────────────────
     df["valor_total_recebido"] = _parse_brl(df["valor_recebido"])
     df["valor_vencido_antes"]  = _parse_brl(df["valor_inadimplencia"])
