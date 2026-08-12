@@ -1135,11 +1135,12 @@ def banner_premiacao() -> None:
     from datetime import date
     from config.settings import CAMPANHA
     meses = pd.period_range(CAMPANHA.inicio, CAMPANHA.fim, freq="M")
-    # Sorteio acontece no mês seguinte ao pagamento (mes+1). O destaque verde
-    # acompanha o sorteio mais próximo de acontecer: primeiro cujo mês de sorteio
-    # ainda não passou em relação a hoje. Se todos já passaram, destaca o último.
+    # O destaque verde acompanha o mês de PAGAMENTO vigente: virou o mês, o
+    # destaque avança para o próximo sorteio (mesma régua do "Em breve" no
+    # calendário de sorteios). Antes da campanha destaca o primeiro; depois
+    # do último mês de pagamento, o último (final do Milhão).
     hoje = pd.Period(date.today(), freq="M")
-    proximo = next((i for i, mes in enumerate(meses) if (mes + 1) >= hoje),
+    proximo = next((i for i, mes in enumerate(meses) if mes >= hoje),
                    len(meses) - 1)
     pills = []
     for i, mes in enumerate(meses):
