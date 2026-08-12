@@ -475,8 +475,13 @@ with tabs[2]:
     _cli_inad = int(df.loc[df["status_elegibilidade"] == "pendente", "cpf_titular"].nunique())
     # Régua do sorteio mensal (Casas) — desde 11/08/2026 a aptidão vem em
     # duas colunas; quitados/cedidos só ficam aptos no mês com movimentação.
+    # Cache de janela anterior ao deploy pode não ter a coluna nova (o
+    # st.cache_data não invalida quando só o adapter muda) — cai na régua única.
+    _col_casas = ("status_elegibilidade_casas"
+                  if "status_elegibilidade_casas" in df.columns
+                  else "status_elegibilidade")
     _cli_casas = int(
-        df.loc[df["status_elegibilidade_casas"] == "elegivel", "cpf_titular"].nunique()
+        df.loc[df[_col_casas] == "elegivel", "cpf_titular"].nunique()
     )
     _t_part = lambda n: {"texto": f"{numero(n)} participantes",
                          "tipo": "neutral", "icon": "fa-users"}
