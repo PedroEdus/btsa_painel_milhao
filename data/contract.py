@@ -39,7 +39,14 @@ COLUNAS: dict[str, str] = {
     "qtd_parcelas_pagas": "Int64",
     # 6.3 Elegibilidade / cupons
     "status_cadastro": "string",         # cadastrado | nao_cadastrado
-    "status_elegibilidade": "string",    # elegivel | bloqueado | pendente
+    "status_elegibilidade": "string",    # elegivel | bloqueado | pendente (régua do Milhão/final)
+    # Desde 11/08/2026 a elegibilidade tem DUAS réguas — a do sorteio mensal
+    # (Casas) exige movimentação no mês para quitadas/cedidas resgatadas.
+    "status_elegibilidade_casas": "string",  # elegivel | pendente (sorteio mensal)
+    "cupons_casas": "Int64",             # cupons do sorteio mensal (Casas)
+    "flag_cessao": "boolean",            # venda gerada por cessão de direito
+    "flag_contrato_quitado": "boolean",  # quitada resgatada (status 3)
+    "flag_contrato_cedido": "boolean",   # cedente resgatado (status 1 por cessão)
     "motivo_bloqueio": "string",
     "cupons_oficiais": "Int64",          # nullable — só quando integração externa
     "flag_contemplado_casa": "boolean",

@@ -12,6 +12,14 @@ sobre valor_gera_cupom (floor(valor/100), conferido 100% na carga 06/07).
 Formato 10/07/2026 (+7 colunas): Valor Recuperado, Antecipação,
 Valor Antecipado, Valor Juros/Multa Inadimplência, Jurídico Ativo/Passivo.
 Todas opcionais — bases antigas caem nos fallbacks (0.0/False/derivado).
+
+Formato 11/08/2026 (+9 colunas): a elegibilidade passa a vir em DUAS réguas
+— Aptidão Sorteio (Milhão/final, régua de parcela vencida) e Aptidão Casas
+(sorteio mensal: quitada/cedida só apta no mês com movimentação) — mais as
+flags de cessão (Cessão, Contrato Quitado, Contrato Cedido, Venda Origem/
+Nova Cessão, Data Cessão/Cedida). [Status Sorteio] segue no bronze por
+retrocompatibilidade. Base antiga sem as colunas novas: as duas réguas
+caem no status_sorteio único e as flags viram False.
 """
 
 from __future__ import annotations
@@ -100,6 +108,13 @@ def adaptar(df: pd.DataFrame) -> pd.DataFrame:
         .fillna(0)
         .astype("Int64")
     )
+    # Cupons do sorteio mensal (Casas) — coluna própria do bronze.
+    if "cupons_casas" in df.columns:
+        df["cupons_casas"] = (
+            pd.to_numeric(df["cupons_casas"], errors="coerce").fillna(0).astype("Int64")
+        )
+    else:
+        df["cupons_casas"] = pd.Series(0, index=df.index, dtype="Int64")
 
     # ── Identificadores ──────────────────────────────────────────────────────
     df["obra"]      = df["obra_nome"]   # nome legível como coluna canônica
@@ -138,8 +153,21 @@ def adaptar(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     # ── Elegibilidade ────────────────────────────────────────────────────────
-    _apto = df["status_sorteio"].astype(str).str.strip().str.upper() == "APTO"
+    # Desde 11/08/2026 não existe mais apto único — são DUAS réguas:
+    #   aptidao_sorteio (Milhão/final)   → régua GLOBAL do painel
+    #   aptidao_casas   (sorteio mensal) → quitada/cedida só apta no mês em
+    #                                      que teve movimentação
+    # Base antiga (só status_sorteio): as duas réguas caem na coluna única.
+    _col_apto = "aptidao_sorteio" if "aptidao_sorteio" in df.columns else "status_sorteio"
+    _apto = df[_col_apto].astype(str).str.strip().str.upper() == "APTO"
+    if "aptidao_casas" in df.columns:
+        _apto_casas = df["aptidao_casas"].astype(str).str.strip().str.upper() == "APTO"
+    else:
+        _apto_casas = _apto
     df["status_elegibilidade"] = _apto.map({True: "elegivel", False: "pendente"})
+    df["status_elegibilidade_casas"] = _apto_casas.map(
+        {True: "elegivel", False: "pendente"}
+    )
     df["status_cadastro"]      = _apto.map({True: "cadastrado", False: "nao_cadastrado"})
 
     # ── Financeiro derivado ──────────────────────────────────────────────────
@@ -201,6 +229,18 @@ def adaptar(df: pd.DataFrame) -> pd.DataFrame:
             df[_col] = df[_col].astype(str).str.strip().str.upper().str.startswith("S")
         else:
             df[_col] = False
+    # Cessão de direito / resgates (query 11/08: 'Sim'/'Não' → bool).
+    # flag_cessao = venda gerada por transferência (cessionário é o cliente);
+    # flag_contrato_quitado = quitada resgatada (status 3, recebeu na campanha);
+    # flag_contrato_cedido = cedente resgatado (cupons pré-cessão).
+    for _col in ("cessao", "contrato_quitado", "contrato_cedido"):
+        _dest = f"flag_{_col}"
+        if _col in df.columns:
+            df[_dest] = (
+                df[_col].astype(str).str.strip().str.upper().str.startswith("S")
+            )
+        else:
+            df[_dest] = False
     df["flag_negociacao"]             = False
     df["titular_principal"]           = True
     df["qtd_compradores"]             = 1

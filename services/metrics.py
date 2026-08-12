@@ -96,6 +96,17 @@ def kpis_executivos(df: pd.DataFrame) -> dict[str, float]:
         "contratos_elegiveis": int(
             contrato[df["status_elegibilidade"] == "elegivel"].nunique()
         ),
+        # Sorteio mensal (Casas): régua própria desde 11/08/2026 — quitada/
+        # cedida só é apta no mês com movimentação. Base antiga cai na
+        # régua única (adapter iguala as duas).
+        "contratos_aptos_casas": int(
+            contrato[df["status_elegibilidade_casas"] == "elegivel"].nunique()
+            if "status_elegibilidade_casas" in df.columns
+            else contrato[df["status_elegibilidade"] == "elegivel"].nunique()
+        ),
+        "cupons_casas": int(
+            df.get("cupons_casas", pd.Series(dtype="Int64")).fillna(0).sum()
+        ),
         # Cupons de contratos APTO — só esses concorrem de fato ao sorteio.
         "cupons_elegiveis": int(
             df.loc[df["status_elegibilidade"] == "elegivel", "cupons_calculados"]

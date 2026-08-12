@@ -263,7 +263,7 @@ with tabs[1]:
          "tooltip": "Total de cupons do sorteio do Milhão gerados na campanha (1 cupom a cada R$ 100 pagos)."},
         {"label": "Cupons elegíveis", "valor": numero(m["cupons_elegiveis"]),
          "icon": "fa-circle-check", "cor": "green",
-         "tooltip": "Cupons gerados por contratos APTO — só esses concorrem de fato aos sorteios."},
+         "tooltip": "Cupons gerados por contratos APTOS na régua do Milhão (Aptidão Sorteio) — só esses concorrem de fato ao sorteio final."},
         {"label": "Cidades acima da média", "valor": f"{numero(_acima)} ({100 * _acima / _n_cid:.0f}%)",
          "icon": "fa-arrow-trend-up", "cor": "green",
          "tooltip": f"Cidades com % de contratos adimplentes maior ou igual à média geral da carteira ({m['pct_adimplencia']:.1f}%)."},
@@ -473,18 +473,26 @@ with tabs[2]:
     # painel é o CONTRATO; o subtexto traz os clientes únicos (CPF) do recorte.
     _cli_eleg = int(df.loc[df["status_elegibilidade"] == "elegivel", "cpf_titular"].nunique())
     _cli_inad = int(df.loc[df["status_elegibilidade"] == "pendente", "cpf_titular"].nunique())
+    # Régua do sorteio mensal (Casas) — desde 11/08/2026 a aptidão vem em
+    # duas colunas; quitados/cedidos só ficam aptos no mês com movimentação.
+    _cli_casas = int(
+        df.loc[df["status_elegibilidade_casas"] == "elegivel", "cpf_titular"].nunique()
+    )
     _t_part = lambda n: {"texto": f"{numero(n)} participantes",
                          "tipo": "neutral", "icon": "fa-users"}
     stat_cards([
         {"label": "Total de contratos", "valor": numero(m["contratos_participantes"]),
          "icon": "fa-users", "cor": "green", "trend": _t_part(m["clientes_participantes"]),
          "tooltip": "Total de contratos (vendas) ativos no portfólio, independente de elegibilidade. Abaixo: clientes únicos (CPF) — um cliente pode ter vários contratos."},
-        {"label": "Elegíveis p/ sorteio", "valor": numero(m["contratos_elegiveis"]),
+        {"label": "Aptos — Milhão (final)", "valor": numero(m["contratos_elegiveis"]),
          "icon": "fa-circle-check", "cor": "green", "trend": _t_part(_cli_eleg),
-         "tooltip": "Contratos com status APTO: sem inadimplência no mês de referência, participam automaticamente dos sorteios. Abaixo: clientes únicos com contrato apto."},
+         "tooltip": "Contratos APTOS na régua do sorteio FINAL (Aptidão Sorteio): sem parcela vencida em aberto. Quitados e cedidos seguem concorrendo com os cupons acumulados. Abaixo: clientes únicos."},
+        {"label": "Aptos — Casas (mês)", "valor": numero(m["contratos_aptos_casas"]),
+         "icon": "fa-house-circle-check", "cor": "blue", "trend": _t_part(_cli_casas),
+         "tooltip": "Contratos APTOS na régua do sorteio MENSAL (Aptidão Casas): quitados/cedidos precisam de movimentação (pagamento) no mês vigente para concorrer ao sorteio do mês. Abaixo: clientes únicos."},
         {"label": "Inadimplentes", "valor": numero(m["contratos_inadimplentes"]),
          "icon": "fa-ban", "cor": "red", "trend": _t_part(_cli_inad),
-         "tooltip": "Contratos com status NÃO APTO: possuem parcelas vencidas e não participam dos sorteios mensais. Abaixo: clientes únicos com contrato inadimplente."},
+         "tooltip": "Contratos NÃO APTOS na régua do Milhão (Aptidão Sorteio): possuem parcelas vencidas em aberto. Abaixo: clientes únicos com contrato inadimplente."},
         {"label": "Cupons do Milhão", "valor": numero(m["cupons_calculados"]),
          "icon": "fa-ticket", "cor": "blue",
          "tooltip": "Cupons do sorteio final do Milhão. Gerado pelo Fabric: soma de cupons por venda. Regra: 1 cupom a cada R$100 de pagamento válido no mês de referência."},
@@ -522,8 +530,10 @@ with tabs[2]:
               descricoes={
                   "Base total": "Todos os contratos (vendas) ativos da carteira, "
                                 "independente da situação de pagamento.",
-                  "Elegíveis": "Contratos APTO — sem parcela vencida no fechamento "
-                               "do período. Participam automaticamente dos sorteios.",
+                  "Elegíveis": "Contratos APTOS na régua do Milhão (Aptidão "
+                               "Sorteio) — sem parcela vencida em aberto. O "
+                               "sorteio mensal (Casas) tem régua própria: "
+                               "quitados/cedidos exigem movimentação no mês.",
                   "Geraram cupons": "Contratos elegíveis que já geraram ao menos 1 "
                                     "cupom (R$ 100 pagos = 1 cupom).",
               })
@@ -714,10 +724,10 @@ with tabs[5]:
          "tooltip": "Valor médio recebido por venda: total recebido ÷ número de vendas únicas ativas no período."},
         {"label": "Cupons do Milhão / contrato apto", "valor": str(m["cupons_por_contrato_apto"]),
          "icon": "fa-ticket", "cor": "blue",
-         "tooltip": "Média de cupons do sorteio do Milhão por contrato elegível: total de cupons ÷ total de contratos com status APTO."},
+         "tooltip": "Média de cupons do sorteio do Milhão por contrato elegível: total de cupons ÷ total de contratos APTOS na régua do Milhão (Aptidão Sorteio)."},
         {"label": "Taxa de elegibilidade", "valor": f"{taxa_cadastro:.1f}%",
          "icon": "fa-user-check", "cor": "amber",
-         "tooltip": "% de contratos com status APTO sobre o total de contratos ativos do portfólio."},
+         "tooltip": "% de contratos APTOS (régua do Milhão — Aptidão Sorteio) sobre o total de contratos ativos do portfólio."},
         {"label": "Novos clientes (campanha)", "valor": numero(novos_clientes(df)),
          "icon": "fa-user-plus", "cor": "blue",
          "tooltip": "Clientes cuja PRIMEIRA venda ocorreu a partir de 01/07/2026 (início da campanha). Cliente antigo que comprou de novo não conta."},

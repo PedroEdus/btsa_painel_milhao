@@ -1,102 +1,59 @@
--- Relatório de Sorteio - Campanha 5 Casas & 1 Milhão (Virada de Prêmios)
--- Período da campanha: 01/07/2026 a 31/12/2026
--- Cupom: R$ 100 recebidos = 1 cupom, sobre o VALOR RECEBIDO INTEGRAL
---   (inclui multa, juros de atraso, correção de atraso e taxa de boleto).
---   Decisão conjunta em reunião, vigente desde 10/08/2026 — substitui a
---   regra do regulamento item 6.3 (que excluía encargos de atraso).
---   SÓ os cupons mudam: as colunas Valor Gera Cupom e Valor Cupom Mês
---   Atual mantêm a composição antiga (sem encargos), como referência.
---   PENDENTE: alinhar a API do site à mesma régua; validação jurídica.
--- Cupons Milhão: acumulado da campanha inteira (sorteio final 18/01/2027).
--- Cupons Casas: valor recebido no mês vigente / 100.
--- APTO: sem parcela vencida em aberto na data da consulta (régua DIÁRIA,
---   alterada 20/07/2026; antes: régua mensal do reg. 6.7 — vencida até o
---   fim do mês anterior). No fechamento do mês as duas réguas coincidem.
--- Inad Junho (data fixa 30/06): 1 = estava inadimplente na largada da campanha
---   (parcela vencida até 30/06 ainda aberta OU paga durante a campanha).
--- Inad Junho continua sendo o marcador de largada (30/06 fixo).
--- Valor Inadimplência: dívida vencida SEM custas (Tipo '1' excluído desde
---   20/07/2026 — alinhado ao padrão do BI Carteira Migração, Custas = Nao).
--- Jurídico Ativo/Passivo: ocorrência jurídica vinculada à venda
---   (OcorrenciaVinculo, NumOco_ocv 4=Ativo / 32=Passivo, Status_ocv=0 aberta).
--- Antecipação: pagamento recebido em mês ANTERIOR ao mês de vencimento
---   da parcela (EOMONTH(Data_Rec) < EOMONTH(DataVenci_Rec)). Granularidade
---   mensal. Independente de Recuperação/APTO —
---   cliente pode antecipar parcela futura e continuar inadimplente/inapto.
--- Recuperação: pagamento recebido DEPOIS da data de vencimento da parcela
---   (Data_Rec > DataVenci_Rec, granularidade diária) = quitou parcela que
---   já estava vencida.
---   Pagamento no próprio dia do vencimento ou antes (mesmo mês) = normal.
--- Valor Juros/Multa Inadimplência: decomposição do Valor Inadimplência
---   (ValJuroAtraso_crc / ValMultaAtraso_crc, ContasReceberCalc), mesmo
---   filtro/universo do Valor Inadimplência (sem Tipo '1' desde 20/07/2026).
--- Valor Antecipado: soma dos recebimentos da campanha pagos antes do
---   vencimento da própria parcela.
--- Empresas excluídas: 3, 204, 226, 229, 301, 302
--- Distrato: Status_Ven = 0 (Normal) é o filtro principal; NOT EXISTS em
---   VendaDistrato fica como redundância/segurança (distrato com status
---   ainda não refletido). Só distrato efetivo (TipoAditivo_vdd = 0, sem
---   aditivo) e aprovado (StatusAprov_vdd = 1 — flag oficial do UAU).
---   Tentativa de Status_Ven IN (0,1,3) revertida 08/07/2026 — trazia
---   23 anos de histórico (234k linhas).
--- Fonte de valores de parcela: CONTROLADORIA.dbo.ContasReceberCalc_bkp
---   (snapshot do job noturno, mesma fonte do BI Carteira Migração).
---   Decisão 10/07: a viva do UAU ficou ~1 dia com valores quebrados em
---   09/07 (instabilidade); _bkp é mais estável (pior caso = D-1).
---   Requer execução na origem (gateway) — espelho não tem CONTROLADORIA.
---   Painel deve alertar queda >20% de inad entre janelas mesmo assim.
--- Cessão de direito (11/08/2026): transferência gera VENDA NOVA no nome
---   do cessionário (VendaHist.NumNovaVend_vhist, TipoMnt_vhist = 2); a
---   venda antiga migra para VendasRecebidas com status 1 (cancelada) e
---   sai da base. Validação sql/validacao_cessoes.sql: 729 cessões na
---   campanha até 10/08 — 82% das vendas novas ativas (já entravam) e 18%
---   já QUITADAS (status 3), que sumiam mesmo com pagamento na campanha.
--- Resgate de quitadas (11/08/2026): além de Status_Ven = 0, entram vendas
---   status 3 (quitada) COM recebimento na campanha (pagou e quitou = apto
---   por definição). Sem recebimento na campanha não entra — senão voltam
---   ~109k quitadas históricas (mesma razão da reversão de 08/07).
---   Cupons da venda ANTIGA não são herdados pela nova. DECISÃO DE NEGÓCIO
---   11/08/2026: cada dono tem o seu cupom — cedente concorre com os
---   cupons gerados enquanto era dono; cessionário com os da venda nova.
---   Quitada na campanha continua concorrendo no sorteio final.
--- Resgate de cedidas (11/08/2026): venda cancelada POR CESSÃO (status 1
---   com cessão aprovada em VendaHist) e com recebimento na campanha
---   ANTES da data da cessão também entra — é o cedente concorrendo com
---   os cupons dele. Cancelada por distrato/cancelamento real segue fora.
---   TODOS os valores de recTotais são cortados em Data_Rec < data da
---   cessão para vendas cedidas: recebimento no dia da cessão ou depois é
---   suspeito de baixa técnica (média R$ 335k/venda — conferir com
---   sql/validacao_recebimentos_tecnicos_cessao.sql) e não vira cupom.
--- Aptidão em 2 colunas (11/08/2026): [Aptidão Casas] (sorteio MENSAL) —
---   quitadas e cedidas resgatadas só ficam APTAS no mês em que tiveram
---   movimentação (recebimento no mês vigente); sem movimentação = NÃO
---   APTO no mês. [Aptidão Sorteio] (Milhão/FINAL) — régua de parcela
---   vencida (igual [Status Sorteio], que fica mantido por
---   retrocompatibilidade). Contratos normais: régua de parcela vencida
---   nas duas colunas.
--- Autor: Carlos Eduardo
--- Última atualização: 11/08/2026 (Pedro — resgate de cessões: quitadas
---   e cedidas com recebimento na campanha; colunas novas no fim:
---   [Cessão], [Venda Origem Cessão], [Data Cessão], [Contrato Quitado],
---   [Contrato Cedido], [Venda Nova Cessão], [Data Cedida]; corte dos
---   recebimentos na data da cessão para vendas cedidas; anti-join
---   Vendas x VendasRecebidas contra duplicata de venda em transição).
---   Anterior 10/08/2026 (Pedro — cupons Milhão/Casas passam a
---   usar o valor recebido INTEGRAL, decisão conjunta em reunião; clamp
---   de cupom negativo em estorno líquido).
---   Anterior 20/07/2026 (Pedro — régua de inadimplência mudou de
---   mensal p/ DIÁRIA: parcela em aberto vencida antes de hoje = inadimplente.
---   Flag e DiasAtraso agora alinhados à régua dos valores de inadimplência.
---   Valores de inadimplência SEM custas (Tipo '1'), padrão BI Carteira
---   Migração; gap de ~R$ 19MM vs card do BI eliminado.
---   Cidade: grupos administrativos (HOLDING%, CONTROLADAS, INVESTIMENTOS,
---   BURITI AGRO-FAZENDAS etc.) deixam de vazar como cidade — caem para a
---   cidade do cadastro da obra (cid_obr). Taquaralto -> Palmas (distrito).
---   Luzimangues MANTIDO como praca propria (decisao 20/07/2026).
---   Anterior 10/07/2026: Jurídico Ativo/Passivo, Antecipação mensal +
---   Recuperação diária com valores, Juros/Multa Inadimplência, exclusão
---   Distrato com TipoAditivo/StatusAprov)
-*/
+-- Base OFICIAL de Julho/2026 - Sorteio 5 Casas & 1 Milhão (Virada de Prêmios)
+-- MESMA estrutura e colunas da query principal (query_sorteio_milhao.sql,
+--   versão 11/08/2026 com resgate de cessões/quitadas), porém com TODAS as
+--   janelas travadas em JULHO. Substitui o snapshot batido em 31/07 como
+--   base oficial do mês (incompleto por baixas tardias e sem as regras de
+--   cessão - decisão 11/08/2026).
+-- Janelas (parametrizadas p/ reuso nos próximos fechamentos):
+--   @IniCampanha = 01/07/2026 (fixo, início da campanha)
+--   @IniMes      = 01/07/2026 (mês do fechamento)
+--   @Corte       = 01/08/2026 (primeiro dia após o fechamento)
+--   Para agosto: @IniMes = 01/08, @Corte = 01/09 (@IniCampanha não muda).
+-- Diferenças obrigatórias vs query do painel (justificadas):
+--   1. APTIDÃO RETROATIVA: parcela vencida até 31/07 em aberto EM 31/07.
+--      Reconstrução em 2 fontes (mesma mecânica do fechamento v2):
+--      (a) parcela em ContasReceber vencida < 01/08 sem recebimento com
+--          Data_Rec < 01/08 (resgate de baixa atrasada: pagou no prazo e
+--          a baixa demorou = não conta como aberta);
+--      (b) parcela vencida < 01/08 paga só com Data_Rec >= 01/08 = estava
+--          aberta no fechamento (pagar em agosto não vira apto de julho).
+--   2. DISTRATO/CESSÃO DE AGOSTO NÃO DERRUBAM JULHO: o NOT EXISTS de
+--      distrato só exclui distrato efetivo aprovado ANTES de 01/08.
+--      Venda distratada em agosto com recebimento em julho ENTRA na
+--      base com flag [Distrato Após Fechamento] = 1, porém como NÃO
+--      APTO no [Status Sorteio], [Aptidão Casas] e [Aptidão Sorteio],
+--      com [Motivo] = DISTRATO APÓS O FECHAMENTO (decisão 11/08/2026:
+--      fica visível para auditoria, não concorre).
+--   3. Inad Junho: parcela vencida até 30/06 aberta em 31/07 OU paga com
+--      Data_Rec >= 01/07 (qualquer data, inclusive agosto+) - mais
+--      preciso que a janela de campanha da query do painel.
+--   4. Cupons Milhão = acumulado da campanha ATÉ o corte (para julho =
+--      próprio julho). Cupons Casas / mês vigente = mês de julho.
+--   5. Aptidão em 2 colunas (11/08/2026): [Aptidão Casas] (mensal) -
+--      quitada/cedida resgatada só é apta no mês com movimentação;
+--      [Aptidão Sorteio] (Milhão/final) - régua retroativa de parcela
+--      vencida. [Status Sorteio] mantido por retrocompatibilidade.
+-- Regras de cessão (decisão de negócio 11/08/2026 - cada dono tem o seu
+--   cupom): venda cedida tem recebimentos cortados em Data_Rec < data da
+--   cessão (baixa técnica não vira cupom); cedente (status 1 por cessão)
+--   e quitada (status 3) entram se tiverem recebimento na janela.
+-- LIMITAÇÕES (valores informativos, não afetam a régua de aptidão):
+--   - [Valor a Receber]/[Valor Inadimplência]/juros/multa: calculados
+--     sobre parcelas AINDA em ContasReceber hoje (parcela paga em agosto
+--     sai do valor, mas o NAO APTO dela segue correto pela fonte (b));
+--     ContasReceberCalc_bkp é snapshot D-1, não histórico de 31/07.
+--   - [Jurídico Ativo/Passivo] e quantidades de parcela: estado atual.
+--   - Venda cadastrada após 31/07 com status 0 aparece com 0 cupons de
+--     julho (inofensivo - elegível downstream exige cupom > 0).
+-- RODAR na origem (BURITI-BD-02 via gateway) - cross-database com
+--   CONTROLADORIA; espelho Fabric não serve. Rodar APÓS as baixas do
+--   fechamento terminarem.
+-- Empresas excluídas: 3, 204, 226, 229, 301, 302 (mesma lista).
+-- Autor: Pedro (11/08/2026), derivada da query principal de Carlos Eduardo
+
+DECLARE @IniCampanha date = '20260701';  -- início da campanha (fixo)
+DECLARE @IniMes      date = '20260701';  -- primeiro dia do mês fechado
+DECLARE @Corte       date = '20260801';  -- primeiro dia após o fechamento
 
 SELECT
     pc.Cidade                                                   [Cidade],
@@ -116,39 +73,41 @@ SELECT
     TelefoneFormatado,
     TipoTelefone,
 
+    -- Inadimplente EM 31/07 (retroativo: fontes (a) e (b) do cabeçalho)
     CASE
-        WHEN crConsolidado.StatusContasReceber = 'Inadimplente' THEN 'Inadimplente'
+        WHEN crConsolidado.StatusContasReceber = 'Inadimplente'
+          OR pagasDepois.NumVend_Rec IS NOT NULL
+            THEN 'Inadimplente'
         ELSE 'Adimplente'
     END                                                         [StatuVenda],
 
     -- Flag: estava inadimplente em 30/06 (largada da campanha)? 1 = sim
     CASE
         WHEN crConsolidado.ParcelaAbertaAntesJulho = 1
-          OR recTotais.PagouVencidaAntesJulho = 1
+          OR inadJun.NumVend_Rec IS NOT NULL
             THEN 1
         ELSE 0
     END                                                         [Inad Junho],
 
-    -- Flag: pagou na campanha parcela DEPOIS do vencimento? 1 = recuperação
+    -- Flag: pagou EM JULHO parcela depois do vencimento? 1 = recuperação
     CASE
         WHEN recTotais.Recuperou = 1 THEN 1
         ELSE 0
     END                                                         [Recuperação],
 
-    -- Valor recebido de parcelas pagas após a data de vencimento (diário)
+    -- Valor recebido em julho de parcelas pagas após o vencimento
     FORMAT(ISNULL(recTotais.ValorRecuperado, 0), 'C')           [Valor Recuperado],
 
-    -- Flag: pagou parcela com vencimento em mês futuro? Independe de
-    -- Recuperação/APTO — antecipar não quita parcela vencida anterior.
+    -- Flag: pagou em julho parcela com vencimento em mês futuro?
     CASE
         WHEN recTotais.Antecipou = 1 THEN 'Sim'
         ELSE 'Não'
     END                                                         [Antecipação],
 
-    -- Valor recebido de parcelas com vencimento em mês futuro (campanha)
+    -- Valor recebido em julho de parcelas com vencimento em mês futuro
     FORMAT(ISNULL(recTotais.ValorAntecipado, 0), 'C')           [Valor Antecipado],
 
-    -- Quantidade por tipo de parcela
+    -- Quantidade por tipo de parcela (estado atual - informativo)
     crConsolidado.Qtd_P                                         [Qtd Parcelas],
     crConsolidado.Qtd_S                                         [Qtd Sinal],
     crConsolidado.Qtd_SA                                        [Qtd Sinal/Arras],
@@ -162,7 +121,7 @@ SELECT
     crConsolidado.Qtd_I                                         [Qtd Intermediacao],
     crConsolidado.Qtd_OP                                        [Qtd Operacao XPI],
 
-    -- Valores gerais
+    -- Valores gerais (ver LIMITAÇÕES no cabeçalho)
     FORMAT(ISNULL(crConsolidado.ValorAReceber,     0), 'C')     [Valor a Receber],
     FORMAT(ISNULL(crConsolidado.ValorInadimplente, 0), 'C')     [Valor Inadimplência],
     FORMAT(ISNULL(crConsolidado.ValorJurosInadimplencia, 0), 'C') [Valor Juros Inadimplência],
@@ -172,48 +131,56 @@ SELECT
     FORMAT(ISNULL(recTotais.ValorCupomMesAtual,    0), 'C')     [Valor Cupom Mês Atual],
     FORMAT(recTotais.DataUltimoRecebimento, 'dd/MM/yyyy')       [Data Último Recebimento],
 
-    -- Cupons: sorteio do Milhão (acumulado da campanha, valor recebido
-    -- INTEGRAL desde 10/08/2026; clamp evita cupom negativo em estorno)
+    -- Cupons: sorteio do Milhão (acumulado da campanha até o corte,
+    -- valor recebido INTEGRAL; clamp evita cupom negativo em estorno)
     IIF(ISNULL(recTotais.ValorRec, 0) > 0,
         FLOOR(ISNULL(recTotais.ValorRec, 0) / 100), 0)          [Cupons Milhão],
 
-    -- Cupons: sorteio das Casas (mês vigente, valor recebido integral)
+    -- Cupons: sorteio das Casas (mês de julho, valor recebido integral)
     IIF(ISNULL(recTotais.ValorRecMesAtual, 0) > 0,
         FLOOR(ISNULL(recTotais.ValorRecMesAtual, 0) / 100), 0)  [Cupons Casas],
 
-    -- Diagnóstico: pagou a parcela do mês anterior?
+    -- Diagnóstico: pagou a parcela de junho (mês anterior ao fechado)?
     CASE
         WHEN parcMesAnt.ParcelaMesPassadoAberta = 1 THEN 'Não'
         ELSE 'Sim'
     END                                                         [Pagou Parcela Mês Anterior],
     DiasAtraso,
 
-    -- Status final do sorteio (Apto / Não Apto)
+    -- Status final do sorteio em 31/07 (Apto / Não Apto).
+    -- Distrato efetivo aprovado após o fechamento = NÃO APTO (decisão
+    -- 11/08/2026): permanece na base para auditoria, não concorre.
     CASE
+        WHEN dist.NumVend_vdd IS NOT NULL
+         AND CAST(COALESCE(dist.DataAprov_vdd, dist.DataCad_vdd) AS DATE) >= @Corte
+            THEN 'NÃO APTO'
         WHEN crConsolidado.StatusContasReceber = 'Inadimplente'
+          OR pagasDepois.NumVend_Rec IS NOT NULL
             THEN 'NÃO APTO'
         ELSE 'APTO'
     END                                                         [Status Sorteio],
 
-    -- Motivo do status do sorteio
     CASE
+        WHEN dist.NumVend_vdd IS NOT NULL
+         AND CAST(COALESCE(dist.DataAprov_vdd, dist.DataCad_vdd) AS DATE) >= @Corte
+            THEN 'DISTRATO APÓS O FECHAMENTO'
         WHEN crConsolidado.StatusContasReceber = 'Inadimplente'
-            THEN 'PARCELA VENCIDA NO ENCERRAMENTO DO PERÍODO'
+          OR pagasDepois.NumVend_Rec IS NOT NULL
+            THEN 'PARCELA VENCIDA EM ABERTO EM 31/07'
         ELSE 'ADIMPLENTE'
     END                                                         [Motivo],
 
-    -- Ocorrência jurídica vinculada à venda (Ativo/Passivo)
+    -- Ocorrência jurídica vinculada à venda (estado atual - informativo)
     CASE WHEN ocor.JuridicoAtivo   = 1 THEN 'Sim' ELSE 'Não' END [Jurídico Ativo],
     CASE WHEN ocor.JuridicoPassivo = 1 THEN 'Sim' ELSE 'Não' END [Jurídico Passivo],
 
-    -- Cessão de direito (11/08/2026): esta venda foi gerada por
-    -- transferência de contrato (cessionário é o cliente atual)
+    -- Cessão de direito: esta venda foi gerada por transferência
     CASE WHEN cess.VendaOrigem IS NOT NULL
         THEN 'Sim' ELSE 'Não' END                                [Cessão],
     cess.VendaOrigem                                             [Venda Origem Cessão],
     FORMAT(cess.DataCessao, 'dd/MM/yyyy')                        [Data Cessão],
 
-    -- Quitada (status 3) resgatada por ter recebimento na campanha
+    -- Quitada (status 3) resgatada por ter recebimento na janela
     CASE WHEN pc.Status_Ven = 3 THEN 'Sim' ELSE 'Não' END        [Contrato Quitado],
 
     -- Cedente (venda cancelada por cessão): concorre com os cupons
@@ -223,23 +190,40 @@ SELECT
     cedida.VendaNova                                             [Venda Nova Cessão],
     FORMAT(cedida.DataCessao, 'dd/MM/yyyy')                      [Data Cedida],
 
-    -- Sorteio MENSAL (Casas): quitada/cedida resgatada só é apta no mês
-    -- em que teve movimentação (recebimento no mês vigente); contrato
-    -- normal segue a régua de parcela vencida
+    -- 1 = distrato efetivo aprovado a partir de 01/08: a venda estava
+    -- ativa no fechamento de julho. Permanece na base para auditoria,
+    -- mas NÃO APTO nas aptidões (decisão 11/08/2026)
+    IIF(dist.NumVend_vdd IS NOT NULL
+        AND CAST(COALESCE(dist.DataAprov_vdd, dist.DataCad_vdd) AS DATE) >= @Corte,
+        1, 0)                                                    [Distrato Após Fechamento],
+
+    -- Sorteio MENSAL (Casas): distrato pós-fechamento = NÃO APTO;
+    -- quitada/cedida resgatada só é apta no mês em que teve movimentação
+    -- (recebimento no mês fechado); contrato normal segue a régua
+    -- retroativa de parcela vencida
     CASE
+        WHEN dist.NumVend_vdd IS NOT NULL
+         AND CAST(COALESCE(dist.DataAprov_vdd, dist.DataCad_vdd) AS DATE) >= @Corte
+            THEN 'NÃO APTO'
         WHEN pc.Status_Ven = 3
           OR (pc.Status_Ven = 1 AND cedida.VendaNova IS NOT NULL)
             THEN IIF(ISNULL(recTotais.ValorRecMesAtual, 0) > 0,
                      'APTO', 'NÃO APTO')
         WHEN crConsolidado.StatusContasReceber = 'Inadimplente'
+          OR pagasDepois.NumVend_Rec IS NOT NULL
             THEN 'NÃO APTO'
         ELSE 'APTO'
     END                                                          [Aptidão Casas],
 
-    -- Sorteio FINAL (Milhão): régua de parcela vencida — quitada/cedida
-    -- segue apta com os cupons acumulados (decisão 11/08/2026)
+    -- Sorteio FINAL (Milhão): distrato pós-fechamento = NÃO APTO;
+    -- demais seguem a régua retroativa de parcela vencida —
+    -- quitada/cedida apta com os cupons acumulados (decisão 11/08/2026)
     CASE
+        WHEN dist.NumVend_vdd IS NOT NULL
+         AND CAST(COALESCE(dist.DataAprov_vdd, dist.DataCad_vdd) AS DATE) >= @Corte
+            THEN 'NÃO APTO'
         WHEN crConsolidado.StatusContasReceber = 'Inadimplente'
+          OR pagasDepois.NumVend_Rec IS NOT NULL
             THEN 'NÃO APTO'
         ELSE 'APTO'
     END                                                          [Aptidão Sorteio]
@@ -248,14 +232,7 @@ FROM
 (
     -- Base de vendas ativas (Vendas + VendasRecebidas)
     SELECT
-        -- Cidade: grupo nivel-cidade da arvore, EXCETO grupos administrativos
-        -- (holdings, controladas etc.), que nao sao praca — nesses casos usa a
-        -- cidade do cadastro da obra (cid_obr). Diagnostico 20/07/2026:
-        -- HOLDING TOCANTINS/OESTE/NORTE, CONTROLADAS, INVESTIMENTOS e
-        -- BURITI AGRO-FAZENDAS vazavam como cidade no painel.
         CASE
-            -- Taquaralto e distrito de Palmas-TO, nao municipio
-            -- (solicitado 20/07/2026)
             WHEN grpCidade.desc_cger = 'TAQUARALTO' THEN 'PALMAS'
             WHEN grpCidade.desc_cger IS NULL
               OR grpCidade.desc_cger IN ('ADMINISTRATIVO', 'INVESTIMENTOS',
@@ -295,8 +272,7 @@ FROM
         FROM VendasRecebidas
         WHERE LEFT(Obra_VRec, 2) IN ('65','67','68','69')
           -- Venda em transição presente nas duas tabelas: vale a linha de
-          -- Vendas (fonte viva). Sem isso, status divergente entre as
-          -- tabelas viraria linha duplicada com o resgate de quitadas.
+          -- Vendas (fonte viva) - evita duplicata no resgate de quitadas
           AND NOT EXISTS (
                 SELECT 1 FROM Vendas v0
                 WHERE v0.Empresa_ven = VendasRecebidas.Empresa_vrec
@@ -313,15 +289,12 @@ FROM
     INNER JOIN Empresas e
         ON  e.Codigo_emp  = o.Empresa_obr
 
-    -- Subgrupo filho da obra (nó direto, qualquer LEN)
     LEFT JOIN GruposDeObra AS grpFilho
         ON  grpFilho.Codigo_cger = o.CodGrupo_obr
 
-    -- Cidade: pai do subgrupo (7 primeiros chars do código filho)
     LEFT JOIN GruposDeObra AS grpCidade
         ON  grpCidade.Codigo_cger = LEFT(grpFilho.Codigo_cger, 7)
 
-    -- Regional: avô do subgrupo (3 primeiros chars do código filho)
     LEFT JOIN GruposDeObra AS grpRegional
         ON  grpRegional.Codigo_cger = LEFT(grpFilho.Codigo_cger, 3)
 
@@ -336,9 +309,8 @@ FROM
 ) AS pc
 
 -- --------------------------------------------------------
--- INNER JOIN: Itens da venda
--- ROW_NUMBER garante 1 linha por venda independente da fonte.
--- ItensRecebidas só entra via anti-join se não houver registro em ItensVenda.
+-- INNER JOIN: Itens da venda (1 linha por venda; ItensRecebidas só
+-- entra via anti-join se não houver registro em ItensVenda)
 -- --------------------------------------------------------
 INNER JOIN
 (
@@ -489,9 +461,6 @@ LEFT JOIN
 
 -- --------------------------------------------------------
 -- LEFT JOIN: Ocorrência jurídica vinculada à venda (Ativo/Passivo)
--- Join direto na venda (empresa + chave concatenada), sem passar por
--- item/unidade. NumOco_ocv: 4 = Jurídico Ativo, 32 = Jurídico Passivo.
--- Status_ocv = 0 -> ocorrência aberta.
 -- --------------------------------------------------------
 LEFT JOIN
 (
@@ -510,12 +479,7 @@ LEFT JOIN
 
 
 -- --------------------------------------------------------
--- LEFT JOIN: Cessão de direito - venda ORIUNDA de transferência.
--- A VendaHist da venda ANTIGA aponta a nova via NumNovaVend_vhist
--- (TipoMnt_vhist = 2, aprovada). Validação 11/08/2026: a antiga migra
--- para VendasRecebidas status 1 (cancelada); DataCessao_Ven fica na
--- venda nova. GROUP BY garante 1 linha por venda nova (cadeia de
--- cessões gera manutenções distintas, nunca 2 origens p/ mesma nova).
+-- LEFT JOIN: Cessão de direito - venda ORIUNDA de transferência
 -- --------------------------------------------------------
 LEFT JOIN
 (
@@ -538,10 +502,7 @@ LEFT JOIN
 
 
 -- --------------------------------------------------------
--- LEFT JOIN: Cessão de direito - venda CEDIDA (lado do cedente).
--- Última cessão aprovada desta venda + número da venda nova gerada.
--- Base do resgate do cedente e das colunas [Contrato Cedido],
--- [Venda Nova Cessão], [Data Cedida].
+-- LEFT JOIN: Cessão de direito - venda CEDIDA (lado do cedente)
 -- --------------------------------------------------------
 LEFT JOIN
 (
@@ -563,16 +524,11 @@ LEFT JOIN
 
 
 -- --------------------------------------------------------
--- LEFT JOIN: ContasReceber consolidado
--- StatusContasReceber: parcela vencida em aberto na data da consulta
---   (régua DIÁRIA desde 20/07/2026: StatuVenda e Status Sorteio).
--- ParcelaAbertaAntesJulho: parcela vencida até 30/06 ainda em aberto
---   (data FIXA: base do flag Inad Junho).
--- ValorInadimplente = dívida vencida SEM custas (Tipo '1' excluído
---   20/07/2026, padrão BI Carteira Migração). ATENÇÃO: a flag
---   StatusContasReceber ainda INCLUI Tipo '1' (decisão pendente).
--- ValorJurosInadimplencia / ValorMultaInadimplencia: decomposição do
---   Valor Inadimplência (mesmo filtro de parcela vencida).
+-- LEFT JOIN: ContasReceber consolidado - APTIDÃO RETROATIVA 31/07.
+-- Fonte (a): parcela vencida < @Corte ainda em ContasReceber SEM
+-- recebimento com Data_Rec < @Corte (anti-join pagas = resgate de
+-- baixa atrasada). Valores de inadimplência: mesma condição
+-- (ver LIMITAÇÕES no cabeçalho). DiasAtraso relativo a 31/07.
 -- --------------------------------------------------------
 LEFT JOIN
 (
@@ -596,42 +552,41 @@ LEFT JOIN
 
         SUM(IIF(cr.Tipo_Prc <> '1', crc.ValParcela_crc, 0))   AS ValorAReceber,
 
-        -- Régua DIÁRIA (20/07/2026): parcela em aberto com vencimento
-        -- anterior a hoje = inadimplente. Vencendo hoje ainda está no prazo.
-        -- Antes: mensal (vencida até o fim do mês anterior - reg. 6.7).
+        -- Aberta em 31/07 (fonte a): vencida < @Corte sem baixa de julho
         MAX(
             CASE
-                WHEN cr.Data_Prc < CAST(GETDATE() AS DATE)
+                WHEN cr.Data_Prc < @Corte
+                 AND pagas.NumVend_Rec IS NULL
                     THEN 'Inadimplente'
             END
         )                                     AS StatusContasReceber,
 
-        -- Vencida até 30/06 ainda em aberto (data fixa - flag Inad Junho)
+        -- Vencida até 30/06 ainda aberta em 31/07 (flag Inad Junho)
         MAX(
             CASE
-                WHEN cr.Data_Prc < '20260701'
+                WHEN cr.Data_Prc < @IniCampanha
+                 AND pagas.NumVend_Rec IS NULL
                     THEN 1
             END
         )                                     AS ParcelaAbertaAntesJulho,
 
-        -- Acompanha a régua diária da flag (senão inadimplente novo
-        -- apareceria com DiasAtraso nulo)
+        -- Dias de atraso na data do fechamento (31/07)
         DATEDIFF(DAY,
             MIN(
                 CASE
-                    WHEN cr.Data_Prc < CAST(GETDATE() AS DATE)
+                    WHEN cr.Data_Prc < @Corte
+                     AND pagas.NumVend_Rec IS NULL
                         THEN cr.Data_Prc
                 END
             ),
-            CAST(GETDATE() AS DATE)
+            DATEADD(DAY, -1, @Corte)
         )                                     AS DiasAtraso,
 
-        -- SEM custas (Tipo '1') desde 20/07/2026 — alinhado ao padrão do
-        -- BI Carteira Migração (toggle Custas = Nao). Antes somava tudo
-        -- e dava ~R$ 19MM acima do card do BI.
+        -- SEM custas (Tipo '1') - padrão BI Carteira Migração
         SUM(
             CASE
-                WHEN cr.Data_Prc < CAST(GETDATE() AS DATE)
+                WHEN cr.Data_Prc < @Corte
+                 AND pagas.NumVend_Rec IS NULL
                  AND cr.Tipo_Prc <> '1'
                     THEN ISNULL(crc.ValPrincipal_crc, 0)
                        + ISNULL(crc.ValJurosComp_crc, 0)
@@ -642,7 +597,8 @@ LEFT JOIN
 
         SUM(
             CASE
-                WHEN cr.Data_Prc < CAST(GETDATE() AS DATE)
+                WHEN cr.Data_Prc < @Corte
+                 AND pagas.NumVend_Rec IS NULL
                  AND cr.Tipo_Prc <> '1'
                     THEN ISNULL(crc.ValJuroAtraso_crc, 0)
                 ELSE 0
@@ -651,7 +607,8 @@ LEFT JOIN
 
         SUM(
             CASE
-                WHEN cr.Data_Prc < CAST(GETDATE() AS DATE)
+                WHEN cr.Data_Prc < @Corte
+                 AND pagas.NumVend_Rec IS NULL
                  AND cr.Tipo_Prc <> '1'
                     THEN ISNULL(crc.ValMultaAtraso_crc, 0)
                 ELSE 0
@@ -659,13 +616,6 @@ LEFT JOIN
         )                                     AS ValorMultaInadimplencia
 
     FROM ContasReceber cr
-    -- ContasReceberCalc_bkp (banco CONTROLADORIA, mesmo servidor): snapshot
-    -- recalculado por job noturno — mesma fonte do BI Carteira Migração.
-    -- Decisão 10/07 (2ª): a ContasReceberCalc viva do UAU ficou ~1 dia
-    -- desatualizada em 09/07 (inad 62M vs 201M) por instabilidade do banco;
-    -- a _bkp degrada no pior caso pra D-1, nunca pra valor quebrado.
-    -- ATENÇÃO: cross-database — a query PRECISA rodar na origem
-    -- (BURITI-BD-02 via gateway); no espelho Fabric CONTROLADORIA não existe.
     LEFT JOIN CONTROLADORIA.dbo.ContasReceberCalc_bkp crc
         ON  crc.Empresa_crc    = cr.Empresa_prc
         AND crc.Obra_crc       = cr.Obra_Prc
@@ -673,6 +623,23 @@ LEFT JOIN
         AND crc.NumParc_crc    = cr.NumParc_Prc
         AND crc.NumParcGer_crc = cr.NumParcGer_Prc
         AND crc.Tipo_crc       = cr.Tipo_Prc
+    -- Parcela com recebimento ATÉ 31/07 = estava paga no fechamento
+    -- (resgate de baixa atrasada: Data_Rec preserva a data real)
+    LEFT JOIN
+    (
+        SELECT DISTINCT
+            Empresa_rec, Obra_Rec, NumVend_Rec,
+            NumParc_Rec, NumParcGer_Rec, Tipo_Rec
+        FROM Recebidas
+        WHERE CAST(Data_Rec AS DATE) < @Corte
+          AND LEFT(Obra_rec, 2) IN ('65','67','68','69')
+    ) AS pagas
+        ON  pagas.Empresa_rec    = cr.Empresa_prc
+        AND pagas.Obra_Rec       = cr.Obra_Prc
+        AND pagas.NumVend_Rec    = cr.NumVend_prc
+        AND pagas.NumParc_Rec    = cr.NumParc_Prc
+        AND pagas.NumParcGer_Rec = cr.NumParcGer_Prc
+        AND pagas.Tipo_Rec       = cr.Tipo_Prc
     WHERE LEFT(cr.Obra_Prc, 2) IN ('65','67','68','69')
     GROUP BY cr.Empresa_prc, cr.Obra_prc, cr.NumVend_prc
 
@@ -683,23 +650,51 @@ LEFT JOIN
 
 
 -- --------------------------------------------------------
--- LEFT JOIN: Valores recebidos na campanha (01/07/2026 a 31/12/2026)
--- ValorRec               = total recebido (todos os componentes)
--- ValorCupom             = base de valor SEM encargos (multa, taxa de
---                          boleto, atraso) -> coluna Valor Gera Cupom
--- ValorCupomMesAtual     = mesma base, mês vigente -> Valor Cupom Mês Atual
--- ValorRecMesAtual       = recebido INTEGRAL do mês -> Cupons Casas
--- CUPONS (Milhão = ValorRec acumulado; Casas = ValorRecMesAtual) dividem
---   o recebido INTEGRAL por 100 desde 10/08/2026; colunas de valor
---   mantêm a composição original
--- PagouVencidaAntesJulho = 1 se pagou na campanha parcela com vencimento
---                          até 30/06 (base do flag Inad Junho)
--- Antecipou/ValorAntecipado = pagamento de parcela com vencimento em mês
---                          POSTERIOR ao mês do recebimento (granularidade
---                          mensal). Não quita parcela vencida anterior.
--- Recuperou/ValorRecuperado = pagamento feito DEPOIS da data de vencimento
---                          da parcela (diário) = quitação de parcela
---                          já vencida.
+-- Fonte (b) da aptidão retroativa: parcela vencida até 31/07 paga
+-- só a partir de 01/08 = estava vencida e aberta no fechamento
+-- --------------------------------------------------------
+LEFT JOIN
+(
+    SELECT DISTINCT
+        r.Empresa_rec,
+        r.Obra_Rec,
+        r.NumVend_Rec
+    FROM Recebidas r
+    WHERE LEFT(r.Obra_rec, 2) IN ('65','67','68','69')
+      AND CAST(r.DataVenci_Rec AS DATE) < @Corte
+      AND CAST(r.Data_Rec     AS DATE) >= @Corte
+) AS pagasDepois
+    ON  pagasDepois.Empresa_rec = pc.Empresa_ven
+    AND pagasDepois.Obra_Rec    = pc.Obra_Ven
+    AND pagasDepois.NumVend_Rec = pc.Num_Ven
+
+
+-- --------------------------------------------------------
+-- Inad Junho, componente pago: parcela vencida até 30/06 paga em
+-- QUALQUER data >= 01/07 (inclusive agosto+) = estava inadimplente
+-- na largada da campanha
+-- --------------------------------------------------------
+LEFT JOIN
+(
+    SELECT DISTINCT
+        r.Empresa_rec,
+        r.Obra_Rec,
+        r.NumVend_Rec
+    FROM Recebidas r
+    WHERE LEFT(r.Obra_rec, 2) IN ('65','67','68','69')
+      AND CAST(r.DataVenci_Rec AS DATE) < @IniCampanha
+      AND CAST(r.Data_Rec     AS DATE) >= @IniCampanha
+) AS inadJun
+    ON  inadJun.Empresa_rec = pc.Empresa_ven
+    AND inadJun.Obra_Rec    = pc.Obra_Ven
+    AND inadJun.NumVend_Rec = pc.Num_Ven
+
+
+-- --------------------------------------------------------
+-- LEFT JOIN: Valores recebidos na janela (@IniCampanha até @Corte -
+-- para julho, o próprio mês). Composições idênticas à query principal.
+-- Venda cedida: recebimento só conta até a VÉSPERA da cessão (baixa
+-- técnica não é pagamento do cedente - decisão 11/08/2026).
 -- --------------------------------------------------------
 LEFT JOIN
 (
@@ -736,7 +731,7 @@ LEFT JOIN
         ))                              AS ValorCupom,
 
         SUM(CASE
-                WHEN CAST(r.Data_Rec AS DATE) >= DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1)
+                WHEN CAST(r.Data_Rec AS DATE) >= @IniMes
                 THEN (
                       r.ValorConf_Rec
                     + r.VlJurosParcConf_Rec
@@ -750,11 +745,8 @@ LEFT JOIN
                 ELSE 0
             END)                        AS ValorCupomMesAtual,
 
-        -- Recebido INTEGRAL do mes vigente (multa, juros/correcao de
-        -- atraso e taxa de boleto inclusos) - base dos Cupons Casas
-        -- desde 10/08/2026. Nao altera as colunas de valor existentes.
         SUM(CASE
-                WHEN CAST(r.Data_Rec AS DATE) >= DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1)
+                WHEN CAST(r.Data_Rec AS DATE) >= @IniMes
                 THEN (
                       r.ValorConf_Rec
                     + r.VlJurosParcConf_Rec
@@ -772,12 +764,6 @@ LEFT JOIN
                 )
                 ELSE 0
             END)                        AS ValorRecMesAtual,
-
-        MAX(CASE
-                WHEN CAST(r.DataVenci_Rec AS DATE) < '20260701'
-                THEN 1
-                ELSE 0
-            END)                        AS PagouVencidaAntesJulho,
 
         MAX(CASE
                 WHEN EOMONTH(r.Data_Rec) < EOMONTH(r.DataVenci_Rec)
@@ -833,10 +819,6 @@ LEFT JOIN
 
         MAX(r.Data_Rec)                 AS DataUltimoRecebimento
     FROM Recebidas r
-    -- Venda cedida: recebimento só conta até a VÉSPERA da cessão.
-    -- No dia da cessão ou depois = suspeita de baixa técnica (não é
-    -- pagamento do cedente) - decisão de negócio 11/08/2026: cada
-    -- dono fica com os cupons gerados enquanto era dono.
     LEFT JOIN
     (
         SELECT Empresa_vhist, Obra_vhist, NumVend_vhist,
@@ -850,8 +832,8 @@ LEFT JOIN
         ON  ced.Empresa_vhist = r.Empresa_rec
         AND ced.Obra_vhist    = r.Obra_rec
         AND ced.NumVend_vhist = r.NumVend_rec
-    WHERE CAST(r.Data_Rec AS DATE) >= '20260701'
-      AND CAST(r.Data_Rec AS DATE) <  '20270101'
+    WHERE CAST(r.Data_Rec AS DATE) >= @IniCampanha
+      AND CAST(r.Data_Rec AS DATE) <  @Corte
       AND r.Tipo_rec <> '1'
       AND LEFT(r.Obra_rec, 2) IN ('65','67','68','69')
       AND (ced.DataCessao IS NULL
@@ -864,8 +846,10 @@ LEFT JOIN
     AND recTotais.NumVend_rec = pc.Num_Ven
 
 
--- LEFT JOIN: Tem parcela do mês passado em aberto? (diagnóstico)
-
+-- --------------------------------------------------------
+-- LEFT JOIN: Tem parcela de junho (mês anterior ao fechado) que
+-- estava em aberto em 31/07? (diagnóstico, com resgate de baixa)
+-- --------------------------------------------------------
 LEFT JOIN
 (
     SELECT DISTINCT
@@ -876,33 +860,76 @@ LEFT JOIN
     FROM ContasReceber cr
     WHERE cr.Tipo_Prc <> '1'
       AND LEFT(cr.Obra_Prc, 2) IN ('65','67','68','69')
-      AND cr.Data_Prc >= DATEADD(MONTH, -1, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))
-      AND cr.Data_Prc <  DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1)
+      AND cr.Data_Prc >= DATEADD(MONTH, -1, @IniMes)
+      AND cr.Data_Prc <  @IniMes
+      AND NOT EXISTS (
+            SELECT 1 FROM Recebidas r
+            WHERE r.Empresa_rec    = cr.Empresa_prc
+              AND r.Obra_Rec       = cr.Obra_Prc
+              AND r.NumVend_Rec    = cr.NumVend_prc
+              AND r.NumParc_Rec    = cr.NumParc_Prc
+              AND r.NumParcGer_Rec = cr.NumParcGer_Prc
+              AND r.Tipo_Rec       = cr.Tipo_Prc
+              AND CAST(r.Data_Rec AS DATE) < @Corte
+      )
 ) AS parcMesAnt
     ON  parcMesAnt.Empresa_prc = pc.Empresa_ven
     AND parcMesAnt.Obra_prc    = pc.Obra_Ven
     AND parcMesAnt.NumVend_prc = pc.Num_Ven
 
+
+-- --------------------------------------------------------
+-- Último distrato EFETIVO e APROVADO da venda (flag Distrato Após
+-- Fechamento + ramo de resgate no WHERE)
+-- --------------------------------------------------------
+LEFT JOIN
+(
+    SELECT
+        d.Empresa_vdd,
+        d.Obra_vdd,
+        d.NumVend_vdd,
+        d.DataCad_vdd,
+        d.DataAprov_vdd
+    FROM
+    (
+        SELECT
+            Empresa_vdd, Obra_vdd, NumVend_vdd, DataCad_vdd, DataAprov_vdd,
+            ROW_NUMBER() OVER (
+                PARTITION BY Empresa_vdd, Obra_vdd, NumVend_vdd
+                ORDER BY DataCad_vdd DESC, Num_vdd DESC
+            ) AS rn
+        FROM VendaDistrato
+        WHERE TipoAditivo_vdd = 0
+          AND StatusAprov_vdd = 1
+    ) AS d
+    WHERE d.rn = 1
+) AS dist
+    ON  dist.Empresa_vdd = pc.Empresa_ven
+    AND dist.Obra_vdd    = pc.Obra_Ven
+    AND dist.NumVend_vdd = pc.Num_Ven
+
+-- --------------------------------------------------------
+-- Pertencimento à base de JULHO:
+--   status 0 = ativa;
+--   status 3 (quitada) com recebimento na janela = segue concorrendo;
+--   status 1 cedida com recebimento real pré-cessão = cedente;
+--   status 1 distratada APÓS o fechamento com recebimento na janela =
+--     estava ativa em 31/07 (flag exposto, decisão dos 92 downstream).
+-- Distrato efetivo aprovado ANTES de 01/08 exclui (estava fora na foto).
+-- --------------------------------------------------------
 WHERE (
         pc.Status_Ven = 0
-        -- Resgate 11/08/2026: quitada (status 3) com recebimento na
-        -- campanha continua concorrendo (caso típico: venda nova de
-        -- cessão já quitada - 128 casos até 10/08; vale também p/
-        -- quitação normal). Sem recebimento na campanha fica fora.
         OR (pc.Status_Ven = 3 AND recTotais.NumVend_rec IS NOT NULL)
-        -- Cedente 11/08/2026: cancelada POR CESSÃO com recebimento real
-        -- antes da cessão (recTotais já vem cortado na data da cessão).
-        -- Cancelada por distrato/cancelamento real continua fora.
         OR (pc.Status_Ven = 1
             AND cedida.VendaNova IS NOT NULL
+            AND recTotais.NumVend_rec IS NOT NULL)
+        OR (pc.Status_Ven = 1
+            AND dist.NumVend_vdd IS NOT NULL
+            AND CAST(COALESCE(dist.DataAprov_vdd, dist.DataCad_vdd) AS DATE) >= @Corte
             AND recTotais.NumVend_rec IS NOT NULL)
       )
   AND pc.Empresa_ven NOT IN (3, 204, 226, 229, 301, 302)
 
-  -- Exclusão de distrato: só distrato efetivo (não aditivo) e aprovado.
-  -- TipoAditivo_vdd: 0 = Distrato, 1 = Aditivo (dicionário UAU).
-  -- StatusAprov_vdd: 0 = Não aprovado, 1 = Aprovado (flag oficial; existem
-  -- aprovados com DataAprov_vdd nula, então não usar a data como filtro).
   AND NOT EXISTS (
         SELECT 1
         FROM VendaDistrato vdd
@@ -911,6 +938,7 @@ WHERE (
           AND vdd.NumVend_vdd      = pc.Num_Ven
           AND vdd.TipoAditivo_vdd  = 0
           AND vdd.StatusAprov_vdd  = 1
+          AND CAST(COALESCE(vdd.DataAprov_vdd, vdd.DataCad_vdd) AS DATE) < @Corte
   )
 
 ORDER BY pc.Cidade, pc.Regional, pc.Obra_Ven;
