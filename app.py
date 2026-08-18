@@ -788,9 +788,12 @@ with tabs[5]:
 
 # ── Tab 6 — Exportação ───────────────────────────────────────────────────────
 with tabs[6]:
-    _df_exp = df.copy()
-    if "empresa_codigo" not in _df_exp.columns:
-        _df_exp["empresa_codigo"] = _df_exp["codempresa"].astype(str)
+    # assign() e shallow (copy-on-write) — df.copy() aqui duplicava a base
+    # inteira em memoria a cada rerun so para acrescentar uma coluna.
+    _df_exp = (
+        df if "empresa_codigo" in df.columns
+        else df.assign(empresa_codigo=df["codempresa"].astype(str))
+    )
     # Elegíveis/inadimplentes contam CONTRATOS únicos (paradigma do painel):
     # unstack por status evita contar a mesma venda 2x quando há >1 comprador.
     _grp_cols = ["regional", "cidade", "empresa_codigo", "obra_nome"]

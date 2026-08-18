@@ -53,6 +53,32 @@ def _parse_brl(series: pd.Series) -> pd.Series:
     )
 
 
+# Fração de valores distintos abaixo da qual uma coluna de texto vira category.
+# 0.5 é folgado de propósito: o ganho real vem das colunas com ~150 valores em
+# 97k linhas (nome de obra, empresa, produto), não das de cardinalidade média.
+_LIMITE_CARDINALIDADE = 0.5
+
+
+def _compactar_texto(df: pd.DataFrame) -> pd.DataFrame:
+    """Converte texto repetido para category — corta ~60% da RAM da base.
+
+    O snapshot repete os mesmos ~150 nomes de obra/empresa em 97k linhas. Como
+    texto solto isso custa 114 MB; como category, 46 MB (medido em 18/08/2026).
+    O painel roda no Streamlit Community Cloud, que derruba o app ao estourar o
+    limite de memória — daí a compactação valer a mudança de dtype.
+
+    Exige pandas >= 3.0: lá o ``groupby`` usa ``observed=True`` por padrão. No
+    2.x o default ``observed=False`` faria groupby de várias category devolver
+    o produto cartesiano das categorias — o oposto do que queremos aqui.
+    """
+    for col in df.columns:
+        if not (df[col].dtype == object or pd.api.types.is_string_dtype(df[col])):
+            continue
+        if df[col].nunique(dropna=False) / max(len(df), 1) < _LIMITE_CARDINALIDADE:
+            df[col] = df[col].astype("category")
+    return df
+
+
 def adaptar(df: pd.DataFrame) -> pd.DataFrame:
     """Transforma snapshot bronze → schema esperado pelos serviços do painel."""
     df = df.copy()
@@ -256,4 +282,4 @@ def adaptar(df: pd.DataFrame) -> pd.DataFrame:
         df["status_inadimplencia_antes"] = "adimplente"
     df["status_apos_pagamento"]       = "adimplente"
 
-    return df
+    return _compactar_texto(df)

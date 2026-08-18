@@ -1,5 +1,5 @@
 streamlit>=1.42
-pandas>=2.2
+pandas>=3.0             # groupby(observed=True) por padrao — ver data/adapter.py
 numpy>=1.26
 plotly>=5.24
 python-dotenv>=1.0

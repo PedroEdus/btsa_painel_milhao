@@ -56,7 +56,10 @@ def segundos_ate_proxima_atualizacao() -> int:
     return max(60, int((proxima_atualizacao() - agora_br()).total_seconds()))
 
 
-@st.cache_data(ttl=12 * 3600, show_spinner="Carregando dados da campanha…")
+# max_entries=1: a base pesa ~50 MB por entrada e o Community Cloud tem teto
+# de memoria. Sem isso a janela das 8h ficava viva junto com a das 15h.
+@st.cache_data(ttl=12 * 3600, max_entries=1,
+               show_spinner="Carregando dados da campanha…")
 def _carregar(janela: str) -> pd.DataFrame:
     # `janela` existe só p/ keyar o cache: muda às 8h/15h BR → nova query.
     # SNAPSHOT_LOCAL (.env): parquet local no formato bronze — usado enquanto

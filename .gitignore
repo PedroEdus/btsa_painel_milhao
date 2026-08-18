@@ -14,3 +14,8 @@ venv/
 *.parquet
 saidas/
 sql/Resultados/
+
+# Exploracao de banco (CONTROLADORIA / UAU): scripts de investigacao ad-hoc,
+# fora do painel. Ficam so na maquina — nao versionar.
+sql/exploracao/
+scripts/explora_controladoria.py
