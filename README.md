@@ -64,27 +64,11 @@ pytest
 
 `packages.txt` instala deps de sistema (apt) do connector.
 
-## Autenticação (acesso restrito @btsa.com.br)
+## Acesso
 
-> **Status: DESLIGADA** (`AUTH_ENABLED=false`, padrão). Painel abre sem login.
-> O código do gate está pronto; ligar = passos abaixo.
-
-O painel usa a **auth nativa do Streamlit** (OIDC, `st.login`/`st.user`,
-≥ 1.42) com login Google. O gate fica em `services/auth.py:exigir_login_btsa`
-e é chamado no topo do `app.py` e de cada arquivo em `pages/` — quando ligado,
-sem login com conta **@btsa.com.br** nada é renderizado.
-
-A checagem do domínio é feita **no servidor**, sobre o e-mail já verificado
-pelo Google (`email_verified`); o `hd` no `client_kwargs` é só dica de UX.
-
-Para LIGAR:
-1. Google Cloud Console → projeto BTSA → OAuth client "Web application".
-2. Authorized redirect URI = URL do app + `/oauth2callback`
-   (`http://localhost:8501/oauth2callback` local; `https://SEU-APP.streamlit.app/oauth2callback` no Cloud).
-3. Preencher a seção `[auth]` em `secrets.toml` (ver `secrets.toml.example`):
-   `client_id`, `client_secret`, `cookie_secret` (aleatório), `redirect_uri`.
-4. Setar `AUTH_ENABLED=true` (`.env` local **e** Secrets do Community Cloud).
-5. (Opcional) Trocar domínio permitido = `DOMINIO_PERMITIDO` em `services/auth.py`.
+O painel **não tem autenticação própria**. Restrinja o acesso pela
+plataforma de hospedagem (Streamlit Community Cloud → Settings →
+Sharing, app privado com lista de e-mails) ou pela rede.
 
 ### ⚠️ Dados sensíveis / LGPD
 

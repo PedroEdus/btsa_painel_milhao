@@ -44,7 +44,6 @@ from services import (
     cupons_media_dia_semana,
     cupons_por_mes,
     cupons_por_tipo,
-    exigir_login_btsa,
     funil_participacao,
     id_contrato,
     inadimplencia_por_faixa,
@@ -93,9 +92,6 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-
-# Gate de acesso: só passa quem logar com conta @btsa.com.br.
-exigir_login_btsa()
 
 
 # Header/tema/splash ANTES da carga: o download do OneLake leva ~30s na 1ª

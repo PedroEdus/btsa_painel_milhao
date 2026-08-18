@@ -24,11 +24,9 @@ from services.metrics import (
     tem_classificacao_origem,
     top_obras,
 )
-from services.auth import exigir_login_btsa
 from services.validation import ResultadoValidacao, validar
 
 __all__ = [
-    "exigir_login_btsa",
     "preparar",
     "kpis_executivos",
     "kpis_carteira",

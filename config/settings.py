@@ -44,21 +44,6 @@ ATUALIZACAO_MARGEM_MINUTOS: int = _env_int("ATUALIZACAO_MARGEM_MINUTOS", 20)
 CUPONS_DISPONIVEIS: int = _env_int("CUPONS_DISPONIVEIS", 0)
 
 
-def _env_list(nome: str) -> tuple[str, ...]:
-    """Lê uma lista separada por vírgula de uma env var. Vazio → tupla vazia."""
-    bruto = os.getenv(nome, "") or ""
-    return tuple(item.strip().lower() for item in bruto.split(",") if item.strip())
-
-
-# ── Controle de acesso (CONTEXT 15) ─────────────────────────────────────────
-# Domínios e e-mails autorizados configuráveis via env/secrets — NUNCA hardcode.
-# Fallback p/ btsa.com.br mantém compatibilidade com a auth atual.
-ALLOWED_EMAIL_DOMAINS: tuple[str, ...] = _env_list("ALLOWED_EMAIL_DOMAINS") or (
-    "btsa.com.br",
-)
-ALLOWED_EMAILS: tuple[str, ...] = _env_list("ALLOWED_EMAILS")
-
-
 @dataclass(frozen=True)
 class RegraCupom:
     """Parâmetros da geração de cupom (CONTEXT seção 5).

@@ -25,7 +25,7 @@ O painel:
 - diferencia explicitamente **cupons calculados internamente** de **cupons oficiais** da plataforma externa;
 - possui cache por janela de atualização da base, alinhado aos horários de carga do Fabric;
 - tem identidade visual customizada com marca Brasil Terrenos, responsividade mobile e modo TV;
-- possui camada de autenticação OIDC pronta, porém desligada por padrão;
+- não possui autenticação própria (acesso controlado pela hospedagem/rede);
 - tem testes automatizados para regra de cupom, janela de atualização e validação de contrato.
 
 ---
@@ -76,14 +76,13 @@ components/
   theme.py                     # CSS, tokens visuais e template Plotly
   ui.py                        # Componentes visuais, gráficos, tabelas, modo TV
 config/
-  settings.py                  # Parâmetros de campanha, atualização, auth e regra de cupom
+  settings.py                  # Parâmetros de campanha, atualização e regra de cupom
 data/
   contract.py                  # Contrato interno de colunas e chaves
   adapter.py                   # Tradução do snapshot bronze para schema interno
   onelake.py                   # Download/leitura de snapshot Parquet no OneLake
   repository.py                # Cache por janela 8h/15h BR e ponto único de acesso
 services/
-  auth.py                      # Gate de login Google/OIDC por domínio/e-mail permitido
   metrics.py                   # Regra de cupom, KPIs e agregações
   validation.py                # Validação de base vazia, obrigatórias e duplicidade
 tests/
@@ -450,17 +449,11 @@ Já foi implementado:
 
 ### 10.1 Auth
 
-Implementado em `services/auth.py`:
-
-- autenticação nativa do Streamlit via OIDC (`st.login`, `st.user`, `st.logout`);
-- login Google;
-- verificação server-side de e-mail verificado;
-- autorização por domínios e/ou e-mails configuráveis:
-  - `ALLOWED_EMAIL_DOMAINS`;
-  - `ALLOWED_EMAILS`;
-- fallback para domínio `btsa.com.br`;
-- `AUTH_ENABLED=false` por padrão;
-- fail-closed se auth estiver ligada e a seção `[auth]` não estiver configurada.
+Removida (18/08/2026). O painel não tem camada de autenticação própria:
+`services/auth.py`, a seção `[auth]` do `secrets.toml`, a env `AUTH_ENABLED`
+e as listas `ALLOWED_EMAIL_DOMAINS`/`ALLOWED_EMAILS` foram excluídas.
+Controle de acesso passa a ser responsabilidade da hospedagem
+(app privado no Streamlit Community Cloud) ou da rede.
 
 ### 10.2 Dados sensíveis
 
@@ -495,9 +488,6 @@ Variáveis relevantes:
 - `AZURE_TENANT_ID`;
 - `AZURE_CLIENT_ID`;
 - `AZURE_CLIENT_SECRET`;
-- `AUTH_ENABLED`;
-- `ALLOWED_EMAIL_DOMAINS`;
-- `ALLOWED_EMAILS`;
 - `META_ARRECADACAO`;
 - `CUPOM_INCLUIR_CUSTAS`;
 - `ATUALIZACAO_MARGEM_MINUTOS`;
@@ -510,7 +500,7 @@ Já documentado no `README.md` como alternativa de validação:
 - apontar o app para `app.py`;
 - preencher `secrets.toml` pelo painel de Secrets;
 - manter `.env` e `secrets.toml` fora do Git;
-- restringir acesso se auth for habilitada.
+- restringir acesso pelo próprio Community Cloud (app privado).
 
 Observação: Community Cloud não deve ser assumido como ambiente definitivo para dados reais sem validação jurídica/segurança.
 
@@ -634,7 +624,7 @@ Pontos técnicos para revisar:
 Ainda pendente definir:
 
 - ambiente definitivo de hospedagem;
-- se `AUTH_ENABLED` ficará ligado em produção;
+- como o acesso será restringido em produção (app privado / rede);
 - responsáveis pela rotação/gestão das credenciais Azure;
 - processo de validação dos números com Carlos/time de negócio;
 - rotina de monitoramento caso o snapshot não seja gerado na janela esperada.
@@ -680,6 +670,6 @@ Checklist mínimo de validação manual:
    - `valor_gera_cupom`.
 4. Atualizar tooltip/textos do painel quando `valor_recuperado` estiver confirmado como disponível.
 5. Decidir e documentar ambiente de produção.
-6. Ligar autenticação (`AUTH_ENABLED=true`) somente após configurar OIDC e secrets em ambiente seguro.
+6. Restringir acesso em produção pela hospedagem (app privado) ou pela rede.
 7. Definir processo de reconciliação com cupons oficiais quando a plataforma externa disponibilizar os dados.
 8. Manter este documento atualizado a cada marco relevante ou mudança de contrato.
