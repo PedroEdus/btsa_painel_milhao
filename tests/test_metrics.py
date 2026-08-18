@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 import pandas as pd
 
 from config.settings import RegraCupom
-from services.metrics import adicionar_cupons, adicionar_valor_elegivel, kpis_executivos
+from services.metrics import (
+    adicionar_cupons,
+    adicionar_valor_elegivel,
+    calendario_sorteios,
+    kpis_executivos,
+)
 
 
 def _df(principal, multa=0.0, juros=0.0, custas=0.0):
@@ -89,3 +96,30 @@ def test_recebimento_por_origem_omite_zerados():
                        "valor_recuperado": [0.0], "valor_antecipado": [0.0]})
     out = recebimento_por_origem(df)
     assert list(out["origem"]) == ["Em dia"]
+
+
+def _realizados(hoje: date) -> int:
+    cal = calendario_sorteios(hoje)
+    return int((cal["Status"] == "Realizado").sum())
+
+
+def test_sorteio_so_conta_a_partir_do_dia_15_do_mes_do_sorteio():
+    # Pagamento jul/26 -> sorteio ago/26, que acontece em 15/08.
+    assert _realizados(date(2026, 8, 14)) == 0
+    assert _realizados(date(2026, 8, 15)) == 1
+    assert _realizados(date(2026, 8, 31)) == 1
+
+
+def test_sorteios_realizados_incrementam_a_cada_dia_15():
+    assert _realizados(date(2026, 9, 15)) == 2
+    assert _realizados(date(2026, 10, 15)) == 3
+    assert _realizados(date(2026, 12, 15)) == 5
+    # Sorteio final (R$ 1.000.000) acontece em 15/01/27 — fecha os 6.
+    assert _realizados(date(2027, 1, 14)) == 5
+    assert _realizados(date(2027, 1, 15)) == 6
+
+
+def test_mes_de_pagamento_vigente_fica_em_breve():
+    cal = calendario_sorteios(date(2026, 8, 18))
+    linha_ago = cal[cal["Pagamento"].str.lower().str.startswith("ago")].iloc[0]
+    assert linha_ago["Status"] == "Em breve"

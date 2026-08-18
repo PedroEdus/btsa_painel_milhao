@@ -506,10 +506,15 @@ def cupons_por_cidade(df: pd.DataFrame, n: int = 8) -> pd.DataFrame:
     )
 
 
-def calendario_sorteios() -> pd.DataFrame:
-    """Calendário: mês pagamento → mês sorteio → prêmio → status."""
+def calendario_sorteios(hoje=None) -> pd.DataFrame:
+    """Calendário: mês pagamento → mês sorteio → prêmio → status.
+
+    O sorteio ocorre no dia ``CAMPANHA.dia_sorteio`` (15) do mês de sorteio:
+    a partir dessa data ele passa a contar como "Realizado" — é o que alimenta
+    o contador ``sorteios_realizados`` do hero.
+    """
     from datetime import date
-    hoje = date.today()
+    hoje = hoje or date.today()
     meses = pd.period_range(CAMPANHA.inicio, CAMPANHA.fim, freq="M")
     rows = []
     for i, mes_pag in enumerate(meses):
@@ -518,7 +523,8 @@ def calendario_sorteios() -> pd.DataFrame:
         premio = "R$ 1.000.000" if is_final else "Casa + Carro"
         ano_sor, mes_num_sor = mes_sor.year, mes_sor.month
         ano_pag, mes_num_pag = mes_pag.year, mes_pag.month
-        if (ano_sor, mes_num_sor) < (hoje.year, hoje.month):
+        data_sorteio = date(ano_sor, mes_num_sor, CAMPANHA.dia_sorteio)
+        if data_sorteio <= hoje:
             status = "Realizado"
         elif (ano_pag, mes_num_pag) == (hoje.year, hoje.month):
             status = "Em breve"

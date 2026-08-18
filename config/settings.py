@@ -84,6 +84,9 @@ class Campanha:
     inicio: date = date(2026, 7, 1)
     fim: date = date(2026, 12, 31)
     qtd_sorteios_mensais: int = 5
+    # Dia do mês em que o sorteio acontece — a partir dele o sorteio do mês
+    # conta como "Realizado" no calendário e no contador do hero.
+    dia_sorteio: int = 15
     premio_final_reais: float = 1_000_000.0
     # Meta de arrecadação exibida no painel — PENDENTE definir com negócio (seção 13)
     meta_arrecadacao: float = field(default_factory=lambda: float(os.getenv("META_ARRECADACAO", "0") or 0))
